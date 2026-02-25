@@ -35,6 +35,7 @@ def main() -> None:
         print("segments:", len(segments))
         if segments:
             print("first:", json.dumps(segments[0], ensure_ascii=False, indent=2))
+            print("all texts:", [f"{s.get("text")} --- {s.get("label")}" for s in segments])
 
 
 if __name__ == "__main__":

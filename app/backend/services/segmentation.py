@@ -18,10 +18,14 @@ from pathlib import Path
 import urllib.request
 import urllib.error
 from typing import Any
+import logging
 
 from services.models import MODELS
 from services.models import RHETORICAL_LABELS
-from services.local_llm import ollama_chat_json
+from services.local_llm import ollama_chat_json, parse_json_loose
+from services.errors import UpstreamServiceError
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Keywords por categoría (usadas en el mock para simular decisión)
@@ -226,19 +230,27 @@ def _call_real_model(text: str, model: str) -> dict:
 
     El modelo recibe TODOS los párrafos en una sola llamada y debe devolver
     un JSON con una entrada por párrafo:
-      {"paragraph_index": 0, "text": "...", "label": "INTRO", "confidence": 0.91}
+      {"paragraph_index": 0, "label": "INTRO", "confidence": 0.91}
     """
 
     api_key = (os.environ.get("GEMINI_API_KEY") or "").strip()
     if not api_key:
         raise ValueError("Falta GEMINI_API_KEY. Para usar el modelo 'api', define GEMINI_API_KEY en el entorno.")
 
-    model_id = (os.environ.get("GEMINI_MODEL") or "gemini-1.5-flash").strip()
+    model_id = (os.environ.get("GEMINI_MODEL") or "gemini-2.5-flash-lite").strip()
     api_base = (os.environ.get("GEMINI_API_BASE") or "https://generativelanguage.googleapis.com/v1beta").strip().rstrip("/")
     temperature = float(os.environ.get("GEMINI_TEMPERATURE") or "0.2")
     max_output_tokens = int(os.environ.get("GEMINI_MAX_OUTPUT_TOKENS") or "4096")
-    timeout_s = float(os.environ.get("GEMINI_TIMEOUT_S") or "30")
+    timeout_s = float(os.environ.get("GEMINI_TIMEOUT_S") or "60")
+    structured_output = (os.environ.get("GEMINI_STRUCTURED_OUTPUT") or "1").strip().lower() not in {
+        "0",
+        "false",
+        "no",
+        "off",
+    }
     response_mime_type = (os.environ.get("GEMINI_RESPONSE_MIME_TYPE") or "").strip()
+    if structured_output and not response_mime_type:
+        response_mime_type = "application/json"
 
     paragraphs = _split_paragraphs(text)
     if not paragraphs:
@@ -254,6 +266,13 @@ def _call_real_model(text: str, model: str) -> dict:
     if response_mime_type:
         generation_config["responseMimeType"] = response_mime_type
 
+    logger.info(
+        "Task1 Gemini request: model=%s paragraphs=%d responseMimeType=%s",
+        model_id,
+        len(paragraphs),
+        generation_config.get("responseMimeType") or "",
+    )
+
     payload = {
         "contents": [
             {"role": "user", "parts": [{"text": prompt}]},
@@ -266,7 +285,15 @@ def _call_real_model(text: str, model: str) -> dict:
     elapsed = round(time.perf_counter() - started, 2)
 
     llm_text = _extract_gemini_text(response_data)
-    parsed = _parse_llm_json(llm_text)
+    logger.debug("Task1 Gemini raw text (truncado): %s", llm_text[:800])
+    try:
+        parsed = parse_json_loose(llm_text)
+    except Exception as e:  # noqa: BLE001
+        logger.exception(
+            "No se pudo parsear JSON desde Gemini (Task1). Texto recibido (truncado): %s",
+            llm_text[:1200],
+        )
+        raise ValueError("Gemini devolvió una respuesta que no es JSON válido (Task1).") from e
 
     segments = _normalize_segments_output(parsed, paragraphs)
     word_count = sum(len(p.split()) for p in paragraphs)
@@ -298,13 +325,20 @@ def _call_local_llm(text: str) -> dict:
         "Devuelve SOLO JSON (sin Markdown), un ARREGLO con la misma cantidad de items que la entrada.\n"
         "Cada item debe tener: paragraph_index (int), label (one of INTRO,BACK,METH,RES,DISC,CONTR,LIM,CONC), confidence (0..1).\n"
         "IMPORTANTE: Usa 'RES' (no 'RESU').\n\n"
+        "IMPORTANTE: NO incluyas el campo 'text' en la salida. NO devuelvas claves extra.\n\n"
         "Entrada (JSON):\n"
         f"{json.dumps(input_items, ensure_ascii=False)}"
+        "ejemplo de salida esperada:\n"
+        '{ "result" : [{"paragraph_index": 0, "label": "INTRO", "confidence": 0.92}, {"paragraph_index": 1, "label": "METH", "confidence": 0.88}, ...]}'
     )
+
+    logger.info("Task1 local LLM request: paragraphs=%d", len(paragraphs))
 
     started = time.perf_counter()
     parsed = ollama_chat_json(prompt)
     elapsed = round(time.perf_counter() - started, 2)
+    logger.debug("Task1 local LLM raw text (truncado): %s", str(parsed)[:800])
+    parsed = parsed.get("result") if isinstance(parsed, dict) and "result" in parsed else parsed
 
     # Reusar normalización existente
     segments = _normalize_segments_output(parsed, paragraphs)
@@ -330,9 +364,9 @@ def _build_gemini_prompt(paragraphs: list[str]) -> str:
         "Clasifica cada párrafo de un artículo científico en español en UNA etiqueta retórica.\n"
         f"Etiquetas válidas: {labels}.\n"
         "Devuelve SOLO un JSON (sin Markdown, sin explicación), como un arreglo con la MISMA cantidad de entradas que párrafos.\n"
+        "IMPORTANTE: NO incluyas el campo 'text' en la salida. NO devuelvas claves extra.\n"
         "Cada entrada debe ser un objeto con:\n"
         '  - "paragraph_index": entero (0..N-1)\n'
-        '  - "text": el párrafo EXACTO tal como aparece en la entrada\n'
         '  - "label": una de las etiquetas válidas\n'
         '  - "confidence": número entre 0 y 1\n'
         "\n"
@@ -355,9 +389,9 @@ def _http_post_json(url: str, payload: dict[str, Any], timeout_s: float) -> dict
             return json.loads(raw)
     except urllib.error.HTTPError as e:
         detail = e.read().decode("utf-8", errors="replace") if hasattr(e, "read") else str(e)
-        raise RuntimeError(f"Gemini HTTP {e.code}: {detail}") from e
+        raise UpstreamServiceError("Gemini", f"HTTP {e.code}: {detail}", status_code=502) from e
     except urllib.error.URLError as e:
-        raise RuntimeError(f"Error de red llamando a Gemini: {e}") from e
+        raise UpstreamServiceError("Gemini", f"Error de red llamando a Gemini: {e}", status_code=503) from e
 
 
 def _extract_gemini_text(response_data: dict[str, Any]) -> str:

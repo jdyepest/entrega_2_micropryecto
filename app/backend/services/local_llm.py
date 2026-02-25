@@ -5,22 +5,25 @@ import urllib.error
 import urllib.request
 from typing import Any
 
+from services.errors import UpstreamServiceError
+
 
 def get_local_llm_model_name() -> str:
     """
     Selección de modelo local (open-weight) con flag para prod:
       - LOCAL_LLM_MODEL: override absoluto (si existe, se usa tal cual)
       - LOCAL_LLM_VARIANT: "small" | "large" (default: small)
-      - LOCAL_LLM_SMALL_MODEL: default llama3.2:3b-instruct
-      - LOCAL_LLM_LARGE_MODEL: default llama3.1:8b-instruct
+      - LOCAL_LLM_SMALL_MODEL: default llama3.2:3b
+      - LOCAL_LLM_LARGE_MODEL: default llama3.1:8b
     """
     override = (os.environ.get("LOCAL_LLM_MODEL") or "").strip()
     if override:
         return override
 
     variant = (os.environ.get("LOCAL_LLM_VARIANT") or "small").strip().lower()
-    small = (os.environ.get("LOCAL_LLM_SMALL_MODEL") or "llama3.2:3b-instruct").strip()
-    large = (os.environ.get("LOCAL_LLM_LARGE_MODEL") or "llama3.1:8b-instruct").strip()
+    # NOTE: Ollama tags can vary; use simple defaults and allow override via env vars.
+    small = (os.environ.get("LOCAL_LLM_SMALL_MODEL") or "llama3.2:3b").strip()
+    large = (os.environ.get("LOCAL_LLM_LARGE_MODEL") or "llama3.1:8b").strip()
 
     return large if variant == "large" else small
 
@@ -30,27 +33,39 @@ def get_ollama_base_url() -> str:
 
 
 def parse_json_loose(text: str) -> Any:
+    def _raw_decode_first(s: str) -> Any:
+        dec = json.JSONDecoder()
+        s2 = s.lstrip()
+        obj, _end = dec.raw_decode(s2)
+        return obj
+
     t = (text or "").strip()
     if not t:
         raise ValueError("Empty model output")
+
     try:
-        return json.loads(t)
+        return _raw_decode_first(t)
     except json.JSONDecodeError:
         pass
 
     fenced = re.search(r"```(?:json)?\s*([\[{].*?[\]}])\s*```", t, flags=re.DOTALL | re.IGNORECASE)
     if fenced:
-        return json.loads(fenced.group(1))
+        return _raw_decode_first(fenced.group(1))
 
-    start_list = t.find("[")
-    end_list = t.rfind("]")
-    if start_list != -1 and end_list != -1 and end_list > start_list:
-        return json.loads(t[start_list : end_list + 1])
+    # Try decoding from the first JSON-looking bracket to ignore trailing text ("extra data").
+    start_any = min([p for p in [t.find("["), t.find("{")] if p != -1], default=-1)
+    if start_any != -1:
+        try:
+            return _raw_decode_first(t[start_any:])
+        except json.JSONDecodeError:
+            pass
 
-    start_obj = t.find("{")
-    end_obj = t.rfind("}")
-    if start_obj != -1 and end_obj != -1 and end_obj > start_obj:
-        return json.loads(t[start_obj : end_obj + 1])
+    # Last attempt: scan for any '{' or '[' and try raw_decode from there.
+    for m in re.finditer(r"[\[{]", t):
+        try:
+            return _raw_decode_first(t[m.start() :])
+        except json.JSONDecodeError:
+            continue
 
     raise ValueError("Could not parse JSON from model output")
 
@@ -84,16 +99,22 @@ def ollama_chat_json(
     try:
         with urllib.request.urlopen(req, timeout=tout) as resp:
             raw = resp.read().decode("utf-8", errors="replace")
+            print(f"Ollama raw response (truncado): {raw[:800]}")
             outer = json.loads(raw)
+            print(f"Ollama parsed response: {outer}")
     except urllib.error.HTTPError as e:
+        
         detail = e.read().decode("utf-8", errors="replace") if hasattr(e, "read") else str(e)
-        raise RuntimeError(f"Ollama HTTP {e.code}: {detail}") from e
+        raise UpstreamServiceError("Ollama", f"HTTP {e.code}: {detail}", status_code=502) from e
     except urllib.error.URLError as e:
-        raise RuntimeError(f"Error de red llamando a Ollama: {e}") from e
+        raise UpstreamServiceError(
+            "Ollama",
+            f"No se pudo conectar a {base_url} (¿ollama está corriendo?). Detalle: {e}",
+            status_code=503,
+        ) from e
 
     content = ((outer.get("message") or {}).get("content") or "").strip()
     if not content:
-        raise RuntimeError(f"Ollama response missing message.content: {outer}")
+        raise UpstreamServiceError("Ollama", f"Respuesta inválida (sin message.content): {outer}", status_code=502)
 
     return parse_json_loose(content)
-

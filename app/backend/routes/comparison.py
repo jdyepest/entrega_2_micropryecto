@@ -67,6 +67,30 @@ def _generate_comparison_metrics(text: str, seed_model: str) -> dict:
 
 @comparison_bp.route("/api/compare/<analysis_id>", methods=["GET"])
 def compare(analysis_id: str):
+    """
+    Devuelve métricas comparativas simuladas para los 3 modelos.
+    ---
+    tags:
+      - comparison
+    produces:
+      - application/json
+    parameters:
+      - name: analysis_id
+        in: path
+        type: string
+        required: true
+    responses:
+      200:
+        description: Métricas de comparación
+        schema:
+          type: object
+      404:
+        description: Análisis no encontrado
+        schema:
+          type: object
+          properties:
+            error: {type: string}
+    """
     store = get_analysis_store()
 
     if analysis_id not in store:

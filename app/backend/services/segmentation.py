@@ -13,6 +13,7 @@ import time
 import random
 import os
 import json
+import hashlib
 from pathlib import Path
 import urllib.request
 import urllib.error
@@ -179,7 +180,7 @@ def _mock_analyze(text: str, model: str) -> dict:
 # Punto de entrada público — REEMPLAZA ESTE BLOQUE CON EL MODELO REAL
 # ---------------------------------------------------------------------------
 
-def analyze_segments(text: str, model: str) -> dict:
+def analyze_segments(text: str, model: str, encoder_variant: str = "roberta") -> dict:
     """
     Analiza el texto y devuelve segmentos retóricos con labels y confianzas.
 
@@ -199,7 +200,7 @@ def analyze_segments(text: str, model: str) -> dict:
         return _call_local_llm(text)
 
     if model == "encoder":
-        return _call_encoder_model(text)
+        return _call_encoder_model(text, encoder_variant=encoder_variant)
 
     # Simular latencia de red/inferencia (solo en mock)
     time.sleep(MODELS[model]["simulated_delay_s"])
@@ -466,9 +467,7 @@ def _normalize_segments_output(parsed: Any, paragraphs: list[str]) -> list[dict[
     return segments
 
 
-_ENCODER_TOKENIZER = None
-_ENCODER_MODEL = None
-_ENCODER_DEVICE = None
+_ENCODER_CACHE: dict[str, tuple[Any, Any, str]] = {}
 
 
 def _repo_root() -> Path:
@@ -487,7 +486,7 @@ def _normalize_encoder_label(label: str) -> str:
     return label
 
 
-def _load_encoder_model():
+def _load_encoder_model(encoder_variant: str):
     """
     Carga el modelo RoBERTa local (RobertaForSequenceClassification) desde:
       - env TASK1_ENCODER_MODEL_PATH, o
@@ -495,9 +494,7 @@ def _load_encoder_model():
 
     Requiere dependencias: torch, transformers, safetensors.
     """
-    global _ENCODER_TOKENIZER, _ENCODER_MODEL, _ENCODER_DEVICE
-    if _ENCODER_MODEL is not None and _ENCODER_TOKENIZER is not None:
-        return _ENCODER_TOKENIZER, _ENCODER_MODEL, _ENCODER_DEVICE
+    global _ENCODER_CACHE
 
     try:
         import torch
@@ -507,15 +504,16 @@ def _load_encoder_model():
             "Para usar model='encoder' instala dependencias: pip install torch transformers safetensors"
         ) from e
 
-    model_dir = (os.environ.get("TASK1_ENCODER_MODEL_PATH") or "").strip()
-    if not model_dir:
-        model_dir = str(_repo_root() / "src" / "models" / "roberta_bne_task1")
-    model_path = Path(model_dir)
+    model_path = _resolve_task1_encoder_model_path(encoder_variant=encoder_variant)
     if not model_path.exists():
         raise FileNotFoundError(
             f"No se encontró el modelo encoder en {model_path}. "
             "Define TASK1_ENCODER_MODEL_PATH apuntando al directorio del modelo."
         )
+
+    cache_key = str(model_path.resolve())
+    if cache_key in _ENCODER_CACHE:
+        return _ENCODER_CACHE[cache_key]
 
     tokenizer = AutoTokenizer.from_pretrained(str(model_path), local_files_only=True)
     model = AutoModelForSequenceClassification.from_pretrained(str(model_path), local_files_only=True)
@@ -524,20 +522,112 @@ def _load_encoder_model():
     device = "cuda" if torch.cuda.is_available() else "cpu"
     model.to(device)
 
-    _ENCODER_TOKENIZER = tokenizer
-    _ENCODER_MODEL = model
-    _ENCODER_DEVICE = device
-    return tokenizer, model, device
+    _ENCODER_CACHE[cache_key] = (tokenizer, model, device)
+    return _ENCODER_CACHE[cache_key]
 
 
-def _call_encoder_model(text: str) -> dict:
+def _resolve_task1_encoder_model_path(encoder_variant: str) -> Path:
+    """
+    Resuelve el path del encoder para Task1.
+
+    Fuentes (prioridad):
+      1) TASK1_ENCODER_<VARIANT>_MLFLOW_MODEL_URI (descarga a cache via mlflow)
+         TASK1_ENCODER_MLFLOW_MODEL_URI (legacy)
+         e.g.:
+           runs:/<run_id>/hf_model
+           models:/scitext-task1-encoder/Production
+      2) TASK1_ENCODER_<VARIANT>_MODEL_PATH (path local) / TASK1_ENCODER_MODEL_PATH (legacy)
+      3) src/models/<variant> (default)
+    """
+    variant = (encoder_variant or "roberta").strip().lower()
+    if variant not in {"roberta", "scibert"}:
+        raise ValueError("encoder_variant inválido. Usa 'roberta' o 'scibert'.")
+
+    mlflow_var = f"TASK1_ENCODER_{variant.upper()}_MLFLOW_MODEL_URI"
+    path_var = f"TASK1_ENCODER_{variant.upper()}_MODEL_PATH"
+
+    mlflow_uri = (os.environ.get(mlflow_var) or "").strip()
+    if not mlflow_uri:
+        mlflow_uri = (os.environ.get("TASK1_ENCODER_MLFLOW_MODEL_URI") or "").strip()
+    if mlflow_uri:
+        return _download_model_from_mlflow(mlflow_uri)
+
+    model_dir = (os.environ.get(path_var) or "").strip()
+    if not model_dir:
+        model_dir = (os.environ.get("TASK1_ENCODER_MODEL_PATH") or "").strip()
+    if not model_dir:
+        default_dir = "roberta_bne_task1" if variant == "roberta" else "scibert_task1"
+        model_dir = str(_repo_root() / "src" / "models" / default_dir)
+    return Path(model_dir)
+
+
+def _download_model_from_mlflow(model_uri: str) -> Path:
+    """
+    Descarga un artefacto de MLflow (S3 o registry) a un cache local y devuelve el directorio.
+    Requiere: pip install mlflow boto3
+    Variables útiles:
+      - MLFLOW_TRACKING_URI (si usas runs:/ o models:/)
+      - MODEL_CACHE_DIR (default: artifacts/model_cache)
+      - AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY / AWS_DEFAULT_REGION
+      - MLFLOW_S3_ENDPOINT_URL (si usas MinIO)
+    """
+    try:
+        import mlflow
+        from mlflow.artifacts import download_artifacts
+    except Exception as e:  # noqa: BLE001
+        raise RuntimeError(
+            "Para cargar el modelo desde MLflow define TASK1_ENCODER_MLFLOW_MODEL_URI y "
+            "instala dependencias: pip install mlflow boto3"
+        ) from e
+
+    tracking_uri = (os.environ.get("MLFLOW_TRACKING_URI") or "").strip()
+    if tracking_uri:
+        mlflow.set_tracking_uri(tracking_uri)
+
+    cache_root = (os.environ.get("MODEL_CACHE_DIR") or str(_repo_root() / "artifacts" / "model_cache")).strip()
+    cache_root_path = Path(cache_root)
+    cache_root_path.mkdir(parents=True, exist_ok=True)
+
+    key = hashlib.sha1(model_uri.encode("utf-8")).hexdigest()[:12]
+    dst = cache_root_path / f"task1_encoder_{key}"
+    dst.mkdir(parents=True, exist_ok=True)
+
+    # If already downloaded, reuse (even if nested)
+    if (dst / "config.json").exists() and ((dst / "model.safetensors").exists() or (dst / "pytorch_model.bin").exists()):
+        return dst
+    existing_cfgs = list(dst.rglob("config.json"))
+    if existing_cfgs:
+        parent = existing_cfgs[0].parent
+        if (parent / "model.safetensors").exists() or (parent / "pytorch_model.bin").exists():
+            return parent
+
+    downloaded_path = download_artifacts(artifact_uri=model_uri, dst_path=str(dst))
+    downloaded = Path(downloaded_path)
+
+    # download_artifacts might return a file or folder; we want the folder containing config/model.
+    if downloaded.is_file():
+        downloaded = downloaded.parent
+
+    # If MLflow created a nested folder, try to locate typical HF files.
+    if not (downloaded / "config.json").exists():
+        candidates = list(downloaded.rglob("config.json"))
+        if candidates:
+            downloaded = candidates[0].parent
+
+    if not (downloaded / "config.json").exists():
+        raise RuntimeError(f"No se encontró config.json dentro del artefacto descargado: {downloaded}")
+
+    return downloaded
+
+
+def _call_encoder_model(text: str, encoder_variant: str = "roberta") -> dict:
     """
     Segmentación real con el encoder RoBERTa local.
     Devuelve {segments:[...], stats:{...}} como el mock.
     """
     import math
 
-    tokenizer, model, device = _load_encoder_model()
+    tokenizer, model, device = _load_encoder_model(encoder_variant=encoder_variant)
     try:
         import torch
     except Exception as e:  # noqa: BLE001

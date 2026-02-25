@@ -23,7 +23,8 @@ def main() -> None:
         "En conclusión, el sistema es útil y planteamos trabajo futuro."
     )
 
-    payload = {"text": sample_text, "model": "encoder", "tasks": ["segmentation"]}
+    variant = (os.environ.get("ENCODER_VARIANT") or "roberta").strip().lower()
+    payload = {"text": sample_text, "model": "encoder", "tasks": ["segmentation"], "encoder_variant": variant}
 
     with app.test_client() as client:
         resp = client.post("/api/analyze", json=payload)
@@ -35,9 +36,8 @@ def main() -> None:
         print("segments:", len(segments))
         if segments:
             print("first:", json.dumps(segments[0], ensure_ascii=False, indent=2))
-            print("all texts:", [f"{s.get("text")} --- {s.get("label")}" for s in segments])
+            print("all texts:", [f"{s.get('text')} --- {s.get('label')}" for s in segments])
 
 
 if __name__ == "__main__":
     main()
-

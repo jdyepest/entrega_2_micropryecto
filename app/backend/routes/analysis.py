@@ -22,6 +22,7 @@ def analyze():
     text = (body.get("text") or "").strip()
     model = body.get("model", "encoder")
     tasks = body.get("tasks", ["segmentation", "contributions"])
+    encoder_variant = (body.get("encoder_variant") or "roberta").strip().lower()
 
     # Validaciones básicas
     if not text:
@@ -30,6 +31,8 @@ def analyze():
         return jsonify({"error": "El texto es demasiado corto (mín. 50 caracteres)."}), 400
     if model not in MODELS:
         return jsonify({"error": f"Modelo '{model}' no válido. Opciones: {list(MODELS.keys())}"}), 400
+    if encoder_variant not in {"roberta", "scibert"}:
+        return jsonify({"error": "encoder_variant no válido. Opciones: ['roberta','scibert']"}), 400
 
     analysis_id = str(uuid.uuid4())
     result: dict = {
@@ -43,7 +46,7 @@ def analyze():
     # Tarea 1: Segmentación retórica
     segmentation_data = None
     if "segmentation" in tasks:
-        segmentation_data = analyze_segments(text, model)
+        segmentation_data = analyze_segments(text, model, encoder_variant=encoder_variant)
         result["segmentation"] = segmentation_data
 
     # Tarea 2: Extracción de contribuciones (requiere segmentos)
@@ -51,7 +54,7 @@ def analyze():
         segments = (
             segmentation_data["segments"]
             if segmentation_data
-            else analyze_segments(text, model)["segments"]
+            else analyze_segments(text, model, encoder_variant=encoder_variant)["segments"]
         )
         result["contributions"] = analyze_contributions(segments, model)
 
@@ -59,6 +62,7 @@ def analyze():
     _analysis_store[analysis_id] = {
         "text": text,
         "model": model,
+        "encoder_variant": encoder_variant,
         "result": result,
     }
 

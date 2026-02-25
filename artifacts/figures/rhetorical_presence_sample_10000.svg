@@ -1,0 +1,22 @@
+<svg xmlns='http://www.w3.org/2000/svg' width='800' height='400'>
+<rect x='0' y='0' width='800' height='400' fill='white' stroke='black' stroke-width='1' />
+<text x='10' y='20' font-size='14'>Presencia de secciones (muestra 10000)</text>
+<line x1='40' y1='360' x2='780' y2='360' stroke='black' />
+<line x1='40' y1='30' x2='40' y2='360' stroke='black' />
+<rect x='40.0' y='360.0' width='85.5' height='0.0' fill='#F18F01' />
+<text x='42.0' y='380' font-size='10' transform='rotate(45 42.0,380)'>BACK</text>
+<rect x='127.5' y='360.0' width='85.5' height='0.0' fill='#F18F01' />
+<text x='129.5' y='380' font-size='10' transform='rotate(45 129.5,380)'>CONC</text>
+<rect x='215.0' y='360.0' width='85.5' height='0.0' fill='#F18F01' />
+<text x='217.0' y='380' font-size='10' transform='rotate(45 217.0,380)'>CONTR</text>
+<rect x='302.5' y='360.0' width='85.5' height='0.0' fill='#F18F01' />
+<text x='304.5' y='380' font-size='10' transform='rotate(45 304.5,380)'>DISC</text>
+<rect x='390.0' y='360.0' width='85.5' height='0.0' fill='#F18F01' />
+<text x='392.0' y='380' font-size='10' transform='rotate(45 392.0,380)'>INTRO</text>
+<rect x='477.5' y='360.0' width='85.5' height='0.0' fill='#F18F01' />
+<text x='479.5' y='380' font-size='10' transform='rotate(45 479.5,380)'>LIM</text>
+<rect x='565.0' y='360.0' width='85.5' height='0.0' fill='#F18F01' />
+<text x='567.0' y='380' font-size='10' transform='rotate(45 567.0,380)'>METH</text>
+<rect x='652.5' y='360.0' width='85.5' height='0.0' fill='#F18F01' />
+<text x='654.5' y='380' font-size='10' transform='rotate(45 654.5,380)'>RES</text>
+</svg>

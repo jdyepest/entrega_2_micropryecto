@@ -1,0 +1,26 @@
+<svg xmlns='http://www.w3.org/2000/svg' width='800' height='400'>
+<rect x='0' y='0' width='800' height='400' fill='white' stroke='black' stroke-width='1' />
+<text x='10' y='20' font-size='14'>Distribucion de palabras (muestra 10000)</text>
+<line x1='40' y1='360' x2='780' y2='360' stroke='black' />
+<line x1='40' y1='30' x2='40' y2='360' stroke='black' />
+<rect x='40.0' y='40.0' width='35.0' height='320.0' fill='#2E86AB' />
+<rect x='76.0' y='329.28927116342237' width='35.0' height='30.710728836577637' fill='#2E86AB' />
+<rect x='112.0' y='354.2055228610231' width='35.0' height='5.794477138976912' fill='#2E86AB' />
+<rect x='148.0' y='357.79085559076503' width='35.0' height='2.209144409234948' fill='#2E86AB' />
+<rect x='184.0' y='358.7686736079674' width='35.0' height='1.231326392032594' fill='#2E86AB' />
+<rect x='220.0' y='359.2394748755093' width='35.0' height='0.7605251244907197' fill='#2E86AB' />
+<rect x='256.0' y='359.5654142145767' width='35.0' height='0.4345857854232685' fill='#2E86AB' />
+<rect x='292.0' y='359.71027614305115' width='35.0' height='0.2897238569488456' fill='#2E86AB' />
+<rect x='328.0' y='359.8913535536442' width='35.0' height='0.10864644635581712' fill='#2E86AB' />
+<rect x='364.0' y='359.7827071072884' width='35.0' height='0.21729289271163424' fill='#2E86AB' />
+<rect x='400.0' y='359.8913535536442' width='35.0' height='0.10864644635581712' fill='#2E86AB' />
+<rect x='436.0' y='359.8913535536442' width='35.0' height='0.10864644635581712' fill='#2E86AB' />
+<rect x='472.0' y='359.9637845178814' width='35.0' height='0.0362154821186057' fill='#2E86AB' />
+<rect x='508.0' y='360.0' width='35.0' height='0.0' fill='#2E86AB' />
+<rect x='544.0' y='359.9637845178814' width='35.0' height='0.0362154821186057' fill='#2E86AB' />
+<rect x='580.0' y='359.9637845178814' width='35.0' height='0.0362154821186057' fill='#2E86AB' />
+<rect x='616.0' y='360.0' width='35.0' height='0.0' fill='#2E86AB' />
+<rect x='652.0' y='360.0' width='35.0' height='0.0' fill='#2E86AB' />
+<rect x='688.0' y='359.9637845178814' width='35.0' height='0.0362154821186057' fill='#2E86AB' />
+<rect x='724.0' y='359.9637845178814' width='35.0' height='0.0362154821186057' fill='#2E86AB' />
+</svg>

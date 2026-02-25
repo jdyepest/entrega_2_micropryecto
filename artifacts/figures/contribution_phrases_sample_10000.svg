@@ -1,0 +1,36 @@
+<svg xmlns='http://www.w3.org/2000/svg' width='800' height='400'>
+<rect x='0' y='0' width='800' height='400' fill='white' stroke='black' stroke-width='1' />
+<text x='10' y='20' font-size='14'>Frecuencia de frases de contribucion (muestra 10000)</text>
+<line x1='150' y1='360' x2='780' y2='360' stroke='black' />
+<line x1='150' y1='30' x2='150' y2='360' stroke='black' />
+<rect x='150' y='40.0' width='512.1951219512194' height='28.0' fill='#4CAF50' />
+<text x='10' y='60.0' font-size='10'>este trabajo propone</text>
+<text x='666.1951219512194' y='60.0' font-size='10'>35</text>
+<rect x='150' y='72.0' width='0.0' height='28.0' fill='#4CAF50' />
+<text x='10' y='92.0' font-size='10'>en este articulo se presenta</text>
+<text x='154.0' y='92.0' font-size='10'>0</text>
+<rect x='150' y='104.0' width='0.0' height='28.0' fill='#4CAF50' />
+<text x='10' y='124.0' font-size='10'>se propone un nuevo enfoque</text>
+<text x='154.0' y='124.0' font-size='10'>0</text>
+<rect x='150' y='136.0' width='0.0' height='28.0' fill='#4CAF50' />
+<text x='10' y='156.0' font-size='10'>este estudio introduce</text>
+<text x='154.0' y='156.0' font-size='10'>0</text>
+<rect x='150' y='168.0' width='0.0' height='28.0' fill='#4CAF50' />
+<text x='10' y='188.0' font-size='10'>la principal contribucion</text>
+<text x='154.0' y='188.0' font-size='10'>0</text>
+<rect x='150' y='200.0' width='0.0' height='28.0' fill='#4CAF50' />
+<text x='10' y='220.0' font-size='10'>se desarrolla un metodo</text>
+<text x='154.0' y='220.0' font-size='10'>0</text>
+<rect x='150' y='232.0' width='600.0' height='28.0' fill='#4CAF50' />
+<text x='10' y='252.0' font-size='10'>los resultados obtenidos demuestran</text>
+<text x='754.0' y='252.0' font-size='10'>41</text>
+<rect x='150' y='264.0' width='14.634146341463415' height='28.0' fill='#4CAF50' />
+<text x='10' y='284.0' font-size='10'>este trabajo aporta evidencia</text>
+<text x='168.6341463414634' y='284.0' font-size='10'>1</text>
+<rect x='150' y='296.0' width='0.0' height='28.0' fill='#4CAF50' />
+<text x='10' y='316.0' font-size='10'>se presenta una metodologia novedosa</text>
+<text x='154.0' y='316.0' font-size='10'>0</text>
+<rect x='150' y='328.0' width='0.0' height='28.0' fill='#4CAF50' />
+<text x='10' y='348.0' font-size='10'>a diferencia de trabajos previos</text>
+<text x='154.0' y='348.0' font-size='10'>0</text>
+</svg>

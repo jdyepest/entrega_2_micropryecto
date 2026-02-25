@@ -13,6 +13,7 @@ import time
 import random
 import os
 import json
+from pathlib import Path
 import urllib.request
 import urllib.error
 from typing import Any
@@ -192,6 +193,9 @@ def analyze_segments(text: str, model: str) -> dict:
     """
     if model == "api":
         return _call_real_model(text, model)
+
+    if model == "encoder":
+        return _call_encoder_model(text)
 
     # Simular latencia de red/inferencia (solo en mock)
     time.sleep(MODELS[model]["simulated_delay_s"])
@@ -417,3 +421,144 @@ def _normalize_segments_output(parsed: Any, paragraphs: list[str]) -> list[dict[
         )
 
     return segments
+
+
+_ENCODER_TOKENIZER = None
+_ENCODER_MODEL = None
+_ENCODER_DEVICE = None
+
+
+def _repo_root() -> Path:
+    # .../app/backend/services/segmentation.py -> repo root is 3 parents above /app
+    return Path(__file__).resolve().parents[3]
+
+
+def _normalize_encoder_label(label: str) -> str:
+    """
+    El modelo fine-tuned usa 'RESU' pero el backend/UI usa 'RES'.
+    Normalizamos para mantener compatibilidad sin tocar el frontend.
+    """
+    label = (label or "").strip().upper()
+    if label == "RESU":
+        return "RES"
+    return label
+
+
+def _load_encoder_model():
+    """
+    Carga el modelo RoBERTa local (RobertaForSequenceClassification) desde:
+      - env TASK1_ENCODER_MODEL_PATH, o
+      - src/models/roberta_bne_task1 (por defecto)
+
+    Requiere dependencias: torch, transformers, safetensors.
+    """
+    global _ENCODER_TOKENIZER, _ENCODER_MODEL, _ENCODER_DEVICE
+    if _ENCODER_MODEL is not None and _ENCODER_TOKENIZER is not None:
+        return _ENCODER_TOKENIZER, _ENCODER_MODEL, _ENCODER_DEVICE
+
+    try:
+        import torch
+        from transformers import AutoModelForSequenceClassification, AutoTokenizer
+    except Exception as e:  # noqa: BLE001
+        raise RuntimeError(
+            "Para usar model='encoder' instala dependencias: pip install torch transformers safetensors"
+        ) from e
+
+    model_dir = (os.environ.get("TASK1_ENCODER_MODEL_PATH") or "").strip()
+    if not model_dir:
+        model_dir = str(_repo_root() / "src" / "models" / "roberta_bne_task1")
+    model_path = Path(model_dir)
+    if not model_path.exists():
+        raise FileNotFoundError(
+            f"No se encontró el modelo encoder en {model_path}. "
+            "Define TASK1_ENCODER_MODEL_PATH apuntando al directorio del modelo."
+        )
+
+    tokenizer = AutoTokenizer.from_pretrained(str(model_path), local_files_only=True)
+    model = AutoModelForSequenceClassification.from_pretrained(str(model_path), local_files_only=True)
+    model.eval()
+
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    model.to(device)
+
+    _ENCODER_TOKENIZER = tokenizer
+    _ENCODER_MODEL = model
+    _ENCODER_DEVICE = device
+    return tokenizer, model, device
+
+
+def _call_encoder_model(text: str) -> dict:
+    """
+    Segmentación real con el encoder RoBERTa local.
+    Devuelve {segments:[...], stats:{...}} como el mock.
+    """
+    import math
+
+    tokenizer, model, device = _load_encoder_model()
+    try:
+        import torch
+    except Exception as e:  # noqa: BLE001
+        raise RuntimeError("Falta torch para inferencia del encoder.") from e
+
+    paragraphs = _split_paragraphs(text)
+    if not paragraphs:
+        paragraphs = [text.strip()]
+
+    started = time.perf_counter()
+    segments: list[dict[str, Any]] = []
+
+    batch_size = int(os.environ.get("TASK1_ENCODER_BATCH_SIZE") or "8")
+    batch_size = max(1, min(batch_size, 64))
+
+    id2label = getattr(model.config, "id2label", None) or {}
+
+    with torch.no_grad():
+        for offset in range(0, len(paragraphs), batch_size):
+            batch = paragraphs[offset : offset + batch_size]
+            inputs = tokenizer(
+                batch,
+                padding=True,
+                truncation=True,
+                max_length=512,
+                return_tensors="pt",
+            )
+            inputs = {k: v.to(device) for k, v in inputs.items()}
+            outputs = model(**inputs)
+            probs = torch.softmax(outputs.logits, dim=-1)
+            confs, preds = torch.max(probs, dim=-1)
+
+            for j, para in enumerate(batch):
+                idx = offset + j
+                pred_id = int(preds[j].item())
+                raw_label = id2label.get(str(pred_id)) or id2label.get(pred_id) or str(pred_id)
+                label = _normalize_encoder_label(str(raw_label))
+                if label not in RHETORICAL_LABELS:
+                    label = "INTRO" if idx == 0 else "CONC" if idx == (len(paragraphs) - 1) else "BACK"
+
+                confidence = float(confs[j].item())
+                if math.isnan(confidence):
+                    confidence = 0.0
+                confidence = round(min(max(confidence, 0.0), 1.0), 2)
+
+                segments.append(
+                    {
+                        "paragraph_index": idx,
+                        "text": para,
+                        "label": label,
+                        "confidence": confidence,
+                    }
+                )
+
+    elapsed = round(time.perf_counter() - started, 2)
+    word_count = sum(len(p.split()) for p in paragraphs)
+    avg_conf = round(sum(s["confidence"] for s in segments) / len(segments), 3) if segments else 0.0
+
+    return {
+        "segments": segments,
+        "stats": {
+            "total_paragraphs": len(paragraphs),
+            "total_words": word_count,
+            "avg_confidence": avg_conf,
+            "time_seconds": elapsed,
+        },
+    }

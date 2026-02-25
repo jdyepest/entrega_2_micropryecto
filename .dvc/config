@@ -1,4 +1,0 @@
-[core]
-    remote = s3public
-['remote "s3public"']
-    url = s3://maia-dvc-datos-microporyecto-tema1-2026/dvcstore

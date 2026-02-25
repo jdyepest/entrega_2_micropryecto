@@ -1,0 +1,6 @@
+outs:
+- md5: d0d2bd35b1cb5d59099594b8e49158cb.dir
+  size: 533020955
+  nfiles: 10
+  hash: md5
+  path: clean_parquet

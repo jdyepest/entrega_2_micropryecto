@@ -38,12 +38,6 @@ const _MOCK = (() => {
 
   const ORDER = ["INTRO","BACK","METH","RES","DISC","CONTR","LIM","CONC"];
 
-  const LABEL_TO_TYPE = {
-    METH:"Metodológica", RES:"Empírica", CONTR:"Recurso",
-    DISC:"Conceptual",   INTRO:"Conceptual", BACK:"Conceptual",
-    LIM:"Conceptual",    CONC:"Metodológica",
-  };
-
   // ── PRNG determinista (xorshift) ─────────────────────────────
   function seededRng(seed) {
     let s = (seed >>> 0) || 1;
@@ -171,14 +165,13 @@ const _MOCK = (() => {
         : 0.30 + rng()*0.30;
       baseC = Math.min(0.99, Math.max(0.10, Math.round(baseC * 100) / 100));
 
-      const ctype    = LABEL_TO_TYPE[seg.label] || "Conceptual";
       const highlight = isContrib ? findHighlight(seg.text) : "";
 
       return {
         paragraph_index: seg.paragraph_index,
         text:           seg.text,
         is_contribution: isContrib,
-        contribution_type: isContrib ? ctype : null,
+        contribution_type: null,
         confidence:     baseC,
         highlight,
         source_label:   seg.label,

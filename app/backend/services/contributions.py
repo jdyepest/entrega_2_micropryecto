@@ -17,9 +17,10 @@ from services.models import MODELS
 from services.local_llm import ollama_chat_json
 
 # ---------------------------------------------------------------------------
-# Mapeo de categorías retóricas a tipos de contribución
+# Nota: Tarea 2 es binaria (is_contribution). No clasificamos tipo de contribución.
+# Usamos un "perfil" solo para elegir patrones de highlight (no se expone al cliente).
 # ---------------------------------------------------------------------------
-_LABEL_TO_TYPE = {
+_LABEL_TO_HIGHLIGHT_PROFILE = {
     "METH":  "Metodológica",
     "RES":   "Empírica",
     "CONTR": "Recurso",
@@ -85,6 +86,21 @@ def _find_highlight(text: str, contribution_type: str, rng: random.Random) -> st
     return text[:80].strip()
 
 
+def _parse_bool(value, default: bool = False) -> bool:
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return bool(int(value))
+    s = str(value).strip().lower()
+    if s in {"true", "t", "1", "yes", "y", "si", "sí"}:
+        return True
+    if s in {"false", "f", "0", "no", "n"}:
+        return False
+    return default
+
+
 def _mock_analyze(segments: list[dict], model: str) -> dict:
     """
     Mock de extracción de contribuciones.
@@ -116,9 +132,6 @@ def _mock_analyze(segments: list[dict], model: str) -> dict:
 
         is_contribution = rng.random() < (base_prob + prob_noise)
 
-        # Tipo de contribución (basado en label)
-        contribution_type = _LABEL_TO_TYPE.get(label, "Conceptual")
-
         # Confianza
         if is_contribution:
             base_conf = 0.78 + rng.uniform(0, 0.18)
@@ -133,13 +146,14 @@ def _mock_analyze(segments: list[dict], model: str) -> dict:
 
         highlight = ""
         if is_contribution:
-            highlight = _find_highlight(text, contribution_type, rng)
+            profile = _LABEL_TO_HIGHLIGHT_PROFILE.get(label, "Conceptual")
+            highlight = _find_highlight(text, profile, rng)
 
         fragments.append({
             "paragraph_index": seg["paragraph_index"],
             "text": text,
             "is_contribution": is_contribution,
-            "contribution_type": contribution_type if is_contribution else None,
+            "contribution_type": None,
             "confidence": confidence,
             "highlight": highlight,
             "source_label": label,
@@ -220,8 +234,11 @@ def _call_local_llm(segments: list[dict]) -> dict:
     parsed = ollama_chat_json(prompt)
     elapsed = round(time.perf_counter() - started, 2)
 
+    if isinstance(parsed, dict):
+        parsed = parsed.get("labels") or parsed.get("fragments") or parsed.get("items") or parsed
+
     if not isinstance(parsed, list):
-        raise TypeError("Salida del modelo inválida: se esperaba un arreglo JSON.")
+        raise TypeError("Salida del modelo inválida: se esperaba un arreglo JSON (o un objeto con 'labels').")
 
     by_idx = {}
     for it in parsed:
@@ -232,17 +249,16 @@ def _call_local_llm(segments: list[dict]) -> dict:
     for seg in segments:
         idx = int(seg["paragraph_index"])
         out = by_idx.get(idx, {})
-        is_contribution = bool(out.get("is_contribution", False))
+        is_contribution = _parse_bool(out.get("is_contribution", False), default=False)
         try:
             confidence = float(out.get("confidence", 0.5))
         except (TypeError, ValueError):
             confidence = 0.5
         confidence = round(min(max(confidence, 0.0), 1.0), 2)
 
-        contribution_type = _LABEL_TO_TYPE.get(seg["label"], "Conceptual")
-        highlight = _find_highlight(seg["text"], contribution_type, random.Random(idx))
+        profile = _LABEL_TO_HIGHLIGHT_PROFILE.get(seg["label"], "Conceptual")
+        highlight = _find_highlight(seg["text"], profile, random.Random(idx))
         if not is_contribution:
-            contribution_type = None
             highlight = ""
 
         fragments.append(
@@ -250,7 +266,7 @@ def _call_local_llm(segments: list[dict]) -> dict:
                 "paragraph_index": idx,
                 "text": seg["text"],
                 "is_contribution": is_contribution,
-                "contribution_type": contribution_type,
+                "contribution_type": None,
                 "confidence": confidence,
                 "highlight": highlight,
                 "source_label": seg["label"],

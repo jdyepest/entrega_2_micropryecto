@@ -303,7 +303,7 @@ function initContributionsView() {
             <span class="${isPos ? "badge-contribution" : "badge-no-contribution"}">
               ${isPos ? "✓ Contribución detectada" : "— Sin contribución"}
             </span>
-            ${isPos ? `<span class="badge-type">${frag.contribution_type}</span>` : ""}
+            ${isPos && frag.contribution_type ? `<span class="badge-type">${frag.contribution_type}</span>` : ""}
             <span class="para-index">Párrafo ${frag.paragraph_index + 1}</span>
           </div>
           <div class="fragment-header-right">

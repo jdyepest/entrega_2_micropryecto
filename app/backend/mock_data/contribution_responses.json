@@ -1,16 +1,11 @@
 {
   "_comment": "Respuestas de ejemplo para referencia. El backend genera respuestas dinámicas.",
-  "contribution_types": [
-    "Metodológica",
-    "Empírica",
-    "Recurso",
-    "Conceptual"
-  ],
+  "task2_note": "Tarea 2 es binaria: solo is_contribution (true/false). No se clasifica tipo de contribución.",
   "example_fragment": {
     "paragraph_index": 2,
     "text": "Proponemos un nuevo método de segmentación retórica basado en transformers multilingüe.",
     "is_contribution": true,
-    "contribution_type": "Metodológica",
+    "contribution_type": null,
     "confidence": 0.94,
     "highlight": "nuevo método de segmentación retórica basado en transformers",
     "source_label": "METH"

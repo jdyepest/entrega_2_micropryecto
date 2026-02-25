@@ -6,6 +6,11 @@ __pycache__/
 *.pyc
 .ipynb_checkpoints/
 *.log
-*.env
+.env
+.env*
 clean_parquet/
 datasets/
+*.safetensors
+model_cache/
+artifacts/
+~/

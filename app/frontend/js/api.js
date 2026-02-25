@@ -10,6 +10,8 @@
  */
 
 const API_BASE = "http://localhost:5000";
+const ANALYZE_TIMEOUT_MS = 60000; // Gemini/LLM/descargas iniciales pueden tardar > 8s
+const COMPARE_TIMEOUT_MS = 8000;
 
 /* ================================================================
    Mock de navegador (replica la lógica del backend en Python)
@@ -236,13 +238,19 @@ const _MOCK = (() => {
    Funciones públicas con fallback automático
    ================================================================ */
 
+function _isNetworkLikeError(err) {
+  // fetch() failures are usually TypeError (DNS/refused/CORS/etc).
+  // No hacemos fallback en timeout (AbortError) porque escondería fallos/latencia real del backend.
+  return err instanceof TypeError;
+}
+
 /**
  * POST /api/analyze — con fallback a mock de navegador.
  */
 async function apiAnalyze(text, model, tasks) {
   try {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 8000); // timeout 8s
+    const timer = setTimeout(() => controller.abort(), ANALYZE_TIMEOUT_MS);
 
     const resp = await fetch(`${API_BASE}/api/analyze`, {
       method: "POST",
@@ -254,14 +262,21 @@ async function apiAnalyze(text, model, tasks) {
 
     if (!resp.ok) {
       const err = await resp.json().catch(() => ({}));
-      throw new Error(err.error || `Error del servidor (${resp.status})`);
+      throw new Error(err.detail || err.error || `Error del servidor (${resp.status})`);
     }
     return resp.json();
 
   } catch (fetchErr) {
-    // Servidor no disponible → usar mock de navegador
-    console.warn("[SciText-ES] Backend no disponible, usando mock local:", fetchErr.message);
-    return _MOCK.mockAnalyze(text, model, tasks);
+    // Solo hacemos fallback cuando el backend no es alcanzable (red/timeout).
+    // Si el backend respondió con error (p.ej. Ollama/Gemini falló) queremos que se vea el fallo real.
+    if (fetchErr?.name === "AbortError") {
+      throw new Error(`Timeout llamando al backend (${Math.round(ANALYZE_TIMEOUT_MS/1000)}s). Reintenta o aumenta el límite.`);
+    }
+    if (_isNetworkLikeError(fetchErr)) {
+      console.warn("[SciText-ES] Backend no disponible, usando mock local:", fetchErr.message);
+      return _MOCK.mockAnalyze(text, model, tasks);
+    }
+    throw fetchErr;
   }
 }
 
@@ -271,7 +286,7 @@ async function apiAnalyze(text, model, tasks) {
 async function apiCompare(analysisId) {
   try {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 8000);
+    const timer = setTimeout(() => controller.abort(), COMPARE_TIMEOUT_MS);
 
     const resp = await fetch(`${API_BASE}/api/compare/${analysisId}`, {
       signal: controller.signal,
@@ -280,12 +295,18 @@ async function apiCompare(analysisId) {
 
     if (!resp.ok) {
       const err = await resp.json().catch(() => ({}));
-      throw new Error(err.error || `Error del servidor (${resp.status})`);
+      throw new Error(err.detail || err.error || `Error del servidor (${resp.status})`);
     }
     return resp.json();
 
   } catch (fetchErr) {
-    console.warn("[SciText-ES] Backend no disponible, usando mock local:", fetchErr.message);
-    return _MOCK.mockCompare(analysisId);
+    if (fetchErr?.name === "AbortError") {
+      throw new Error(`Timeout llamando al backend (${Math.round(COMPARE_TIMEOUT_MS/1000)}s). Reintenta.`);
+    }
+    if (_isNetworkLikeError(fetchErr)) {
+      console.warn("[SciText-ES] Backend no disponible, usando mock local:", fetchErr.message);
+      return _MOCK.mockCompare(analysisId);
+    }
+    throw fetchErr;
   }
 }

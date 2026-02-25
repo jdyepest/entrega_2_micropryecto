@@ -22,7 +22,7 @@ El enfoque es académico y experimental, orientado a entregar una solución func
 | Tarea | Descripción | Labels / Tipos |
 |-------|-------------|----------------|
 | **Tarea 1** | Segmentación retórica | INTRO, BACK, METH, RES, DISC, CONTR, LIM, CONC |
-| **Tarea 2** | Extracción de contribuciones | Metodológica, Empírica, Recurso, Conceptual |
+| **Tarea 2** | Detección de contribuciones (binaria) | is_contribution = true/false |
 
 ## Estructura del proyecto
 
@@ -163,7 +163,8 @@ Abre http://localhost:5000 en tu navegador.
 {
   "text": "Texto del artículo…",
   "model": "encoder | llm | api",
-  "tasks": ["segmentation", "contributions"]
+  "tasks": ["segmentation", "contributions"],
+  "encoder_variant": "roberta | scibert"
 }
 ```
 Devuelve segmentos etiquetados y fragmentos con contribuciones.
@@ -198,6 +199,32 @@ Los stubs tienen comentarios con ejemplos de integración para Hugging Face (enc
 PORT=5000       # Puerto del servidor (por defecto: 5000)
 DEBUG=1         # Modo debug de Flask (por defecto: 1)
 ```
+
+### Modelos encoder (Task1 + Task2) vía MLflow (S3)
+
+Para evitar commitear archivos grandes (por ejemplo `model.safetensors`) en GitHub, puedes subir los modelos a MLflow y referenciarlos por URI `runs:/...`.
+
+**Cache local (evita re-descargas):**
+```bash
+MODEL_CACHE_DIR=artifacts/model_cache
+```
+
+**Task1 (segmentación retórica):**
+```bash
+TASK1_ENCODER_ROBERTA_MLFLOW_MODEL_URI="runs:/<run_id>/hf_model"
+TASK1_ENCODER_SCIBERT_MLFLOW_MODEL_URI="runs:/<run_id>/hf_model"
+```
+
+**Task2 (contribuciones binario):**
+```bash
+TASK2_ENCODER_ROBERTA_MLFLOW_MODEL_URI="runs:/<run_id>/hf_model"
+TASK2_ENCODER_SCIBERT_MLFLOW_MODEL_URI="runs:/<run_id>/hf_model"
+TASK2_ENCODER_THRESHOLD=0.5
+```
+
+**Scripts útiles:**
+- Subir una carpeta HF a MLflow: `app/backend/scripts/mlflow_log_hf_model.py`
+- Entrenar encoder Task2 (train=silver, eval=gold) y loguear a MLflow: `src/task2_contributions/train_task2_encoder.py`
 
 ### Dependencias de la app
 

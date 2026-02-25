@@ -11,8 +11,14 @@ _call_real_model() y pon la lógica de inferencia ahí.
 import re
 import time
 import random
+import os
+import json
+import urllib.request
+import urllib.error
+from typing import Any
 
 from services.models import MODELS
+from services.models import RHETORICAL_LABELS
 
 # ---------------------------------------------------------------------------
 # Keywords por categoría (usadas en el mock para simular decisión)
@@ -184,7 +190,10 @@ def analyze_segments(text: str, model: str) -> dict:
 
     TODO: Reemplazar _mock_analyze() por _call_real_model() cuando las APIs estén disponibles.
     """
-    # Simular latencia de red/inferencia
+    if model == "api":
+        return _call_real_model(text, model)
+
+    # Simular latencia de red/inferencia (solo en mock)
     time.sleep(MODELS[model]["simulated_delay_s"])
     return _mock_analyze(text, model)
 
@@ -195,22 +204,216 @@ def analyze_segments(text: str, model: str) -> dict:
 
 def _call_real_model(text: str, model: str) -> dict:
     """
-    STUB — Implementar con llamada real al modelo.
+    Llamada real a Gemini (Google Generative Language API).
 
-    Encoder:
-        from transformers import pipeline
-        classifier = pipeline("text-classification", model="dccuchile/bert-base-spanish-wwm-cased")
-        ...
+    Config por variables de entorno:
+      - GEMINI_API_KEY (requerida)
+      - GEMINI_MODEL (opcional, default: gemini-1.5-flash)
+      - GEMINI_API_BASE (opcional, default: https://generativelanguage.googleapis.com/v1beta)
+      - GEMINI_TEMPERATURE (opcional, default: 0.2)
+      - GEMINI_MAX_OUTPUT_TOKENS (opcional, default: 4096)
+      - GEMINI_TIMEOUT_S (opcional, default: 30)
+      - GEMINI_RESPONSE_MIME_TYPE (opcional, por ejemplo: application/json)
 
-    LLM Open-Weight:
-        import requests
-        response = requests.post(OLLAMA_ENDPOINT, json={"model": "llama3", "prompt": prompt})
-        ...
-
-    API Comercial:
-        from openai import OpenAI
-        client = OpenAI(api_key=API_KEY)
-        response = client.chat.completions.create(model="gpt-4o", messages=[...])
-        ...
+    El modelo recibe TODOS los párrafos en una sola llamada y debe devolver
+    un JSON con una entrada por párrafo:
+      {"paragraph_index": 0, "text": "...", "label": "INTRO", "confidence": 0.91}
     """
-    raise NotImplementedError("Real model not yet configured.")
+
+    api_key = (os.environ.get("GEMINI_API_KEY") or "").strip()
+    if not api_key:
+        raise ValueError("Falta GEMINI_API_KEY. Para usar el modelo 'api', define GEMINI_API_KEY en el entorno.")
+
+    model_id = (os.environ.get("GEMINI_MODEL") or "gemini-1.5-flash").strip()
+    api_base = (os.environ.get("GEMINI_API_BASE") or "https://generativelanguage.googleapis.com/v1beta").strip().rstrip("/")
+    temperature = float(os.environ.get("GEMINI_TEMPERATURE") or "0.2")
+    max_output_tokens = int(os.environ.get("GEMINI_MAX_OUTPUT_TOKENS") or "4096")
+    timeout_s = float(os.environ.get("GEMINI_TIMEOUT_S") or "30")
+    response_mime_type = (os.environ.get("GEMINI_RESPONSE_MIME_TYPE") or "").strip()
+
+    paragraphs = _split_paragraphs(text)
+    if not paragraphs:
+        paragraphs = [text.strip()]
+
+    prompt = _build_gemini_prompt(paragraphs)
+
+    url = f"{api_base}/models/{model_id}:generateContent?key={api_key}"
+    generation_config: dict[str, Any] = {
+        "temperature": temperature,
+        "maxOutputTokens": max_output_tokens,
+    }
+    if response_mime_type:
+        generation_config["responseMimeType"] = response_mime_type
+
+    payload = {
+        "contents": [
+            {"role": "user", "parts": [{"text": prompt}]},
+        ],
+        "generationConfig": generation_config,
+    }
+
+    started = time.perf_counter()
+    response_data = _http_post_json(url, payload, timeout_s=timeout_s)
+    elapsed = round(time.perf_counter() - started, 2)
+
+    llm_text = _extract_gemini_text(response_data)
+    parsed = _parse_llm_json(llm_text)
+
+    segments = _normalize_segments_output(parsed, paragraphs)
+    word_count = sum(len(p.split()) for p in paragraphs)
+    avg_conf = round(sum(s["confidence"] for s in segments) / len(segments), 3) if segments else 0.0
+
+    return {
+        "segments": segments,
+        "stats": {
+            "total_paragraphs": len(paragraphs),
+            "total_words": word_count,
+            "avg_confidence": avg_conf,
+            "time_seconds": elapsed,
+        },
+    }
+
+
+def _build_gemini_prompt(paragraphs: list[str]) -> str:
+    labels = ", ".join(RHETORICAL_LABELS)
+    input_items = [{"paragraph_index": i, "text": p} for i, p in enumerate(paragraphs)]
+    input_json = json.dumps(input_items, ensure_ascii=False)
+    return (
+        "Clasifica cada párrafo de un artículo científico en español en UNA etiqueta retórica.\n"
+        f"Etiquetas válidas: {labels}.\n"
+        "Devuelve SOLO un JSON (sin Markdown, sin explicación), como un arreglo con la MISMA cantidad de entradas que párrafos.\n"
+        "Cada entrada debe ser un objeto con:\n"
+        '  - "paragraph_index": entero (0..N-1)\n'
+        '  - "text": el párrafo EXACTO tal como aparece en la entrada\n'
+        '  - "label": una de las etiquetas válidas\n'
+        '  - "confidence": número entre 0 y 1\n'
+        "\n"
+        "Entrada (JSON):\n"
+        f"{input_json}\n"
+    )
+
+
+def _http_post_json(url: str, payload: dict[str, Any], timeout_s: float) -> dict[str, Any]:
+    data = json.dumps(payload).encode("utf-8")
+    req = urllib.request.Request(
+        url,
+        data=data,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=timeout_s) as resp:
+            raw = resp.read().decode("utf-8", errors="replace")
+            return json.loads(raw)
+    except urllib.error.HTTPError as e:
+        detail = e.read().decode("utf-8", errors="replace") if hasattr(e, "read") else str(e)
+        raise RuntimeError(f"Gemini HTTP {e.code}: {detail}") from e
+    except urllib.error.URLError as e:
+        raise RuntimeError(f"Error de red llamando a Gemini: {e}") from e
+
+
+def _extract_gemini_text(response_data: dict[str, Any]) -> str:
+    """
+    Extrae texto del primer candidato. Formato típico:
+      candidates[0].content.parts[*].text
+    """
+    candidates = response_data.get("candidates") or []
+    if not candidates:
+        raise RuntimeError(f"Respuesta Gemini sin candidates: {response_data}")
+    content = (candidates[0].get("content") or {})
+    parts = content.get("parts") or []
+    texts = []
+    for part in parts:
+        t = part.get("text")
+        if t:
+            texts.append(t)
+    text = "\n".join(texts).strip()
+    if not text:
+        raise RuntimeError(f"Respuesta Gemini sin texto en parts: {response_data}")
+    return text
+
+
+def _parse_llm_json(text: str) -> Any:
+    """
+    Intenta parsear JSON aunque venga con cercas ```json ... ```.
+    """
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        pass
+
+    fenced = re.search(
+        r"```(?:json)?\s*([\[{].*?[\]}])\s*```",
+        text,
+        flags=re.DOTALL | re.IGNORECASE,
+    )
+    if fenced:
+        return json.loads(fenced.group(1))
+
+    # Fallback: tomar desde el primer '[' hasta el último ']' si existe, si no, '{' ... '}'
+    start_list = text.find("[")
+    end_list = text.rfind("]")
+    if start_list != -1 and end_list != -1 and end_list > start_list:
+        return json.loads(text[start_list : end_list + 1])
+
+    start_obj = text.find("{")
+    end_obj = text.rfind("}")
+    if start_obj != -1 and end_obj != -1 and end_obj > start_obj:
+        return json.loads(text[start_obj : end_obj + 1])
+
+    raise ValueError("No se pudo parsear JSON desde la respuesta del modelo.")
+
+
+def _normalize_segments_output(parsed: Any, paragraphs: list[str]) -> list[dict[str, Any]]:
+    """
+    Acepta:
+      - lista de objetos (uno por párrafo), o
+      - dict con clave 'segments' que contiene esa lista.
+    Siempre devuelve segmentos en orden y asegura paragraph_index/text correctos.
+    """
+    if isinstance(parsed, dict) and "segments" in parsed:
+        items = parsed["segments"]
+    else:
+        items = parsed
+
+    if not isinstance(items, list):
+        raise TypeError("Salida del modelo inválida: se esperaba un arreglo JSON (o un objeto con 'segments').")
+
+    # Intentar mapear por paragraph_index si existe y es usable
+    by_index: dict[int, dict[str, Any]] = {}
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        idx = item.get("paragraph_index")
+        if isinstance(idx, int) and 0 <= idx < len(paragraphs):
+            by_index[idx] = item
+
+    segments: list[dict[str, Any]] = []
+    for i, para in enumerate(paragraphs):
+        item = by_index.get(i)
+        if item is None and i < len(items) and isinstance(items[i], dict):
+            item = items[i]
+        if item is None:
+            raise ValueError(f"Salida del modelo no incluye el párrafo {i}.")
+
+        label = str(item.get("label") or "").strip().upper()
+        if label not in RHETORICAL_LABELS:
+            raise ValueError(f"Label inválido para párrafo {i}: '{label}'. Debe ser uno de {RHETORICAL_LABELS}.")
+
+        conf = item.get("confidence")
+        try:
+            confidence = float(conf)
+        except (TypeError, ValueError):
+            confidence = 0.5
+        confidence = round(min(max(confidence, 0.0), 1.0), 2)
+
+        segments.append(
+            {
+                "paragraph_index": i,
+                "text": para,
+                "label": label,
+                "confidence": confidence,
+            }
+        )
+
+    return segments

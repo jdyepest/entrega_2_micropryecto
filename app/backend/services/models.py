@@ -18,7 +18,7 @@ MODELS = {
     },
     "llm": {
         "name": "LLM Open-Weight (Llama/Mistral)",
-        "description": "Modelo 1-8B parámetros en inferencia local",
+        "description": "Modelo open-weight local (Ollama). Default ~3B; cambia a 7/8B con env LOCAL_LLM_VARIANT=large",
         "icon": "🧠",
         "tag": "Balanceado",
         "color": "#7B1FA2",

@@ -11,8 +11,10 @@ _call_real_model() y pon la lógica de inferencia ahí.
 import re
 import time
 import random
+import json
 
 from services.models import MODELS
+from services.local_llm import ollama_chat_json
 
 # ---------------------------------------------------------------------------
 # Mapeo de categorías retóricas a tipos de contribución
@@ -177,6 +179,9 @@ def analyze_contributions(segments: list[dict], model: str) -> dict:
 
     TODO: Reemplazar _mock_analyze() por _call_real_model() cuando las APIs estén disponibles.
     """
+    if model == "llm":
+        return _call_local_llm(segments)
+
     time.sleep(MODELS[model]["simulated_delay_s"] * 0.5)
     return _mock_analyze(segments, model)
 
@@ -192,3 +197,79 @@ def _call_real_model(segments: list[dict], model: str) -> dict:
     El formato de retorno debe ser idéntico al de _mock_analyze().
     """
     raise NotImplementedError("Real model not yet configured.")
+
+
+def _call_local_llm(segments: list[dict]) -> dict:
+    """
+    LLM open-weight local (p.ej. Ollama) para decidir si cada segmento expresa
+    explícitamente una contribución científica (binario).
+    """
+    items = [{"paragraph_index": s["paragraph_index"], "text": s["text"], "label": s["label"]} for s in segments]
+    prompt = (
+        "Decide si cada fragmento (párrafo) expresa EXPLÍCITAMENTE una contribución científica.\n"
+        "Marca positivo SOLO si hay formulación explícita de aporte/novelty (p.ej. 'proponemos', 'presentamos', 'nuestra contribución', 'ponemos a disposición').\n"
+        "Devuelve SOLO JSON (sin Markdown) como ARREGLO, un item por entrada con:\n"
+        '  - "paragraph_index": int\n'
+        '  - "is_contribution": boolean\n'
+        '  - "confidence": number 0..1\n\n'
+        "Entrada (JSON):\n"
+        f"{json.dumps(items, ensure_ascii=False)}"
+    )
+
+    started = time.perf_counter()
+    parsed = ollama_chat_json(prompt)
+    elapsed = round(time.perf_counter() - started, 2)
+
+    if not isinstance(parsed, list):
+        raise TypeError("Salida del modelo inválida: se esperaba un arreglo JSON.")
+
+    by_idx = {}
+    for it in parsed:
+        if isinstance(it, dict) and isinstance(it.get("paragraph_index"), int):
+            by_idx[int(it["paragraph_index"])] = it
+
+    fragments = []
+    for seg in segments:
+        idx = int(seg["paragraph_index"])
+        out = by_idx.get(idx, {})
+        is_contribution = bool(out.get("is_contribution", False))
+        try:
+            confidence = float(out.get("confidence", 0.5))
+        except (TypeError, ValueError):
+            confidence = 0.5
+        confidence = round(min(max(confidence, 0.0), 1.0), 2)
+
+        contribution_type = _LABEL_TO_TYPE.get(seg["label"], "Conceptual")
+        highlight = _find_highlight(seg["text"], contribution_type, random.Random(idx))
+        if not is_contribution:
+            contribution_type = None
+            highlight = ""
+
+        fragments.append(
+            {
+                "paragraph_index": idx,
+                "text": seg["text"],
+                "is_contribution": is_contribution,
+                "contribution_type": contribution_type,
+                "confidence": confidence,
+                "highlight": highlight,
+                "source_label": seg["label"],
+            }
+        )
+
+    positives = [f for f in fragments if f["is_contribution"]]
+    avg_conf_pos = (
+        round(sum(f["confidence"] for f in positives) / len(positives), 3)
+        if positives else 0.0
+    )
+
+    return {
+        "fragments": fragments,
+        "stats": {
+            "total_fragments": len(fragments),
+            "positive": len(positives),
+            "negative": len(fragments) - len(positives),
+            "avg_confidence_positive": avg_conf_pos,
+            "time_seconds": elapsed,
+        },
+    }

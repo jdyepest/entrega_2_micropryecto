@@ -20,6 +20,7 @@ from typing import Any
 
 from services.models import MODELS
 from services.models import RHETORICAL_LABELS
+from services.local_llm import ollama_chat_json
 
 # ---------------------------------------------------------------------------
 # Keywords por categoría (usadas en el mock para simular decisión)
@@ -194,6 +195,9 @@ def analyze_segments(text: str, model: str) -> dict:
     if model == "api":
         return _call_real_model(text, model)
 
+    if model == "llm":
+        return _call_local_llm(text)
+
     if model == "encoder":
         return _call_encoder_model(text)
 
@@ -263,6 +267,45 @@ def _call_real_model(text: str, model: str) -> dict:
     llm_text = _extract_gemini_text(response_data)
     parsed = _parse_llm_json(llm_text)
 
+    segments = _normalize_segments_output(parsed, paragraphs)
+    word_count = sum(len(p.split()) for p in paragraphs)
+    avg_conf = round(sum(s["confidence"] for s in segments) / len(segments), 3) if segments else 0.0
+
+    return {
+        "segments": segments,
+        "stats": {
+            "total_paragraphs": len(paragraphs),
+            "total_words": word_count,
+            "avg_confidence": avg_conf,
+            "time_seconds": elapsed,
+        },
+    }
+
+
+def _call_local_llm(text: str) -> dict:
+    """
+    LLM open-weight local (p.ej. Ollama). Usa 1 llamada con TODOS los párrafos.
+    Selección de modelo ~3B vs 7/8B vía env en services/local_llm.py.
+    """
+    paragraphs = _split_paragraphs(text)
+    if not paragraphs:
+        paragraphs = [text.strip()]
+
+    input_items = [{"paragraph_index": i, "text": p} for i, p in enumerate(paragraphs)]
+    prompt = (
+        "Clasifica cada párrafo de un artículo científico en español en UNA etiqueta retórica.\n"
+        "Devuelve SOLO JSON (sin Markdown), un ARREGLO con la misma cantidad de items que la entrada.\n"
+        "Cada item debe tener: paragraph_index (int), label (one of INTRO,BACK,METH,RES,DISC,CONTR,LIM,CONC), confidence (0..1).\n"
+        "IMPORTANTE: Usa 'RES' (no 'RESU').\n\n"
+        "Entrada (JSON):\n"
+        f"{json.dumps(input_items, ensure_ascii=False)}"
+    )
+
+    started = time.perf_counter()
+    parsed = ollama_chat_json(prompt)
+    elapsed = round(time.perf_counter() - started, 2)
+
+    # Reusar normalización existente
     segments = _normalize_segments_output(parsed, paragraphs)
     word_count = sum(len(p.split()) for p in paragraphs)
     avg_conf = round(sum(s["confidence"] for s in segments) / len(segments), 3) if segments else 0.0

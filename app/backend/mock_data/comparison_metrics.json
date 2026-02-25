@@ -1,0 +1,17 @@
+{
+  "_comment": "Métricas de referencia. El backend genera comparaciones dinámicas por texto.",
+  "reference_metrics": {
+    "task1_metrics": {
+      "encoder": {"f1": 0.83, "precision": 0.85, "recall": 0.82, "latency": 0.3},
+      "llm":     {"f1": 0.79, "precision": 0.77, "recall": 0.81, "latency": 2.1},
+      "api":     {"f1": 0.87, "precision": 0.89, "recall": 0.86, "latency": 1.4}
+    },
+    "task2_metrics": {
+      "encoder": {"f1": 0.78, "precision": 0.81, "recall": 0.76, "latency": 0.4},
+      "llm":     {"f1": 0.82, "precision": 0.80, "recall": 0.84, "latency": 3.5},
+      "api":     {"f1": 0.91, "precision": 0.93, "recall": 0.89, "latency": 2.2}
+    },
+    "cost_per_doc": {"encoder": 0.001, "llm": 0.008, "api": 0.035},
+    "total_time":   {"encoder": 1.4,   "llm": 5.6,   "api": 3.6}
+  }
+}

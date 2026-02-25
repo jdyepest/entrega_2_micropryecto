@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SciText-ES — Comparación de modelos</title>
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+
+  <!-- Loading overlay -->
+  <div id="loading-overlay" class="loading-overlay">
+    <div class="spinner"></div>
+    <p class="loading-text">Cargando métricas comparativas…</p>
+  </div>
+
+  <!-- Navbar -->
+  <nav class="navbar">
+    <div class="navbar-brand">
+      SciText-ES <span class="badge-es">ES</span>
+    </div>
+    <div class="navbar-steps">
+      <span class="step done">① Entrada</span>
+      <span class="step-sep">›</span>
+      <span class="step done">② Segmentación</span>
+      <span class="step-sep">›</span>
+      <span class="step done">③ Contribuciones</span>
+      <span class="step-sep">›</span>
+      <span class="step active">④ Comparación</span>
+    </div>
+  </nav>
+
+  <div class="page-container">
+
+    <div class="page-header">
+      <h1>Comparación de modelos</h1>
+      <p>Métricas de desempeño, costo y latencia de los 3 enfoques sobre el texto analizado</p>
+    </div>
+
+    <div id="comparison-error"></div>
+
+    <!-- Headers de modelos -->
+    <div class="comparison-header-cards">
+      <div class="model-header-card encoder">
+        <div class="model-header-icon">⚡</div>
+        <div class="model-header-name">Encoder (BETO/RoBERTa)</div>
+        <div class="model-header-desc">Clasificador fine-tuned · Español científico</div>
+      </div>
+      <div class="model-header-card llm">
+        <div class="model-header-icon">🧠</div>
+        <div class="model-header-name">LLM Open-Weight</div>
+        <div class="model-header-desc">Llama / Mistral 1–8B · Inferencia local</div>
+      </div>
+      <div class="model-header-card api">
+        <div class="model-header-icon">☁️</div>
+        <div class="model-header-name">API Comercial</div>
+        <div class="model-header-desc">GPT / Gemini · API externa</div>
+      </div>
+    </div>
+
+    <!-- Tabla Tarea 1 -->
+    <div class="metrics-section">
+      <h2>Tarea 1 — Segmentación retórica</h2>
+      <div id="table-task1">
+        <!-- Generado por app.js -->
+      </div>
+    </div>
+
+    <!-- Tabla Tarea 2 -->
+    <div class="metrics-section">
+      <h2>Tarea 2 — Extracción de contribuciones</h2>
+      <div id="table-task2">
+        <!-- Generado por app.js -->
+      </div>
+    </div>
+
+    <!-- Gráficos de barras -->
+    <div class="charts-row">
+      <div class="chart-card">
+        <div class="chart-title">Costo por documento (USD)</div>
+        <div id="chart-cost" class="bar-chart">
+          <!-- Generado por app.js -->
+        </div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Tiempo total de análisis (s)</div>
+        <div id="chart-time" class="bar-chart">
+          <!-- Generado por app.js -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Tarjetas trade-off -->
+    <h2 style="margin-bottom:1rem; font-size:1rem; text-transform:uppercase; letter-spacing:.07em; color:var(--text-secondary); font-family:var(--font-sans); font-weight:600;">
+      Trade-offs por modelo
+    </h2>
+    <div id="tradeoff-cards" class="tradeoff-cards">
+      <!-- Generado por app.js -->
+    </div>
+
+    <!-- Navegación -->
+    <div class="view-nav">
+      <a href="contributions.html" class="btn btn-secondary">← Contribuciones</a>
+      <div class="view-nav-right">
+        <button id="btn-export-report" class="btn btn-secondary">↓ Exportar reporte</button>
+        <a href="index.html" class="btn btn-primary" onclick="sessionStorage.clear()">
+          Nuevo análisis
+        </a>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="js/api.js"></script>
+  <script src="js/app.js"></script>
+  <script src="js/charts.js"></script>
+</body>
+</html>

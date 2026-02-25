@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SciText-ES — Análisis de documentos científicos</title>
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+
+  <!-- Navbar -->
+  <nav class="navbar">
+    <div class="navbar-brand">
+      SciText-ES <span class="badge-es">ES</span>
+    </div>
+    <div class="navbar-steps">
+      <span class="step active">① Entrada</span>
+      <span class="step-sep">›</span>
+      <span class="step">② Segmentación</span>
+      <span class="step-sep">›</span>
+      <span class="step">③ Contribuciones</span>
+      <span class="step-sep">›</span>
+      <span class="step">④ Comparación</span>
+    </div>
+  </nav>
+
+  <!-- Loading overlay -->
+  <div id="loading-overlay" class="loading-overlay">
+    <div class="spinner"></div>
+    <p class="loading-text">Analizando documento…</p>
+  </div>
+
+  <!-- Contenido principal -->
+  <main class="input-view">
+    <div class="input-view-header">
+      <h1>Análisis de documentos científicos en español</h1>
+      <p>Segmentación retórica y extracción de contribuciones con modelos de NLP</p>
+    </div>
+
+    <div id="error-container"></div>
+
+    <form id="analyze-form" novalidate>
+
+      <!-- Sección 1: Texto -->
+      <div class="input-section">
+        <div class="input-section-title">Texto del artículo científico</div>
+        <div class="textarea-wrapper">
+          <textarea
+            id="text-input"
+            name="text"
+            class="text-input"
+            placeholder="Pega aquí el texto del artículo científico en español. Se recomienda al menos 250 caracteres (varios párrafos) para obtener resultados significativos.
+
+Ejemplo de inicio:
+En este trabajo presentamos un sistema de segmentación retórica automática para documentos científicos en español. La identificación de las secciones retóricas de un artículo —introducción, metodología, resultados, conclusiones— es una tarea fundamental para la recuperación de información en el dominio científico…"
+            rows="10"
+          ></textarea>
+          <span id="char-counter" class="char-counter">0 caracteres</span>
+        </div>
+        <p class="text-small text-secondary mt-1">
+          Recomendado: mínimo 250 caracteres · El texto se divide en párrafos por líneas en blanco
+        </p>
+      </div>
+
+      <!-- Sección 2: Modelo -->
+      <div class="input-section">
+        <div class="input-section-title">Selecciona el modelo</div>
+        <div class="model-cards">
+
+          <label class="model-card selected">
+            <input type="radio" name="model" value="encoder" checked />
+            <div class="model-card-icon">⚡</div>
+            <div class="model-card-name">Encoder</div>
+            <div class="model-card-tag">Rápido · Bajo costo</div>
+            <p class="text-small text-secondary mt-1">BETO / RoBERTa-BNE fine-tuned</p>
+          </label>
+
+          <label class="model-card">
+            <input type="radio" name="model" value="llm" />
+            <div class="model-card-icon">🧠</div>
+            <div class="model-card-name">LLM Open-Weight</div>
+            <div class="model-card-tag">Balanceado</div>
+            <p class="text-small text-secondary mt-1">Llama / Mistral 1–8B</p>
+          </label>
+
+          <label class="model-card">
+            <input type="radio" name="model" value="api" />
+            <div class="model-card-icon">☁️</div>
+            <div class="model-card-name">API Comercial</div>
+            <div class="model-card-tag">Mayor calidad</div>
+            <p class="text-small text-secondary mt-1">GPT / Gemini vía API</p>
+          </label>
+
+        </div>
+      </div>
+
+      <!-- Sección 3: Tareas -->
+      <div class="input-section">
+        <div class="input-section-title">Tareas a ejecutar</div>
+        <div class="task-toggles">
+
+          <label class="toggle-item">
+            <input type="checkbox" id="task-seg" name="tasks" value="segmentation" checked />
+            <span class="toggle-track"></span>
+            <div>
+              <div class="toggle-label">Tarea 1 — Segmentación retórica</div>
+              <div class="toggle-sub">Clasifica cada párrafo en 8 categorías (INTRO, METH, RES…)</div>
+            </div>
+          </label>
+
+          <label class="toggle-item">
+            <input type="checkbox" id="task-cont" name="tasks" value="contributions" checked />
+            <span class="toggle-track"></span>
+            <div>
+              <div class="toggle-label">Tarea 2 — Extracción de contribuciones</div>
+              <div class="toggle-sub">Identifica fragmentos con aportes científicos</div>
+            </div>
+          </label>
+
+        </div>
+      </div>
+
+      <!-- Enviar -->
+      <div class="submit-area">
+        <button type="submit" class="btn btn-primary btn-large">
+          Analizar documento →
+        </button>
+        <p class="text-small text-secondary mt-1">
+          El análisis puede tardar entre 1 y 6 segundos según el modelo
+        </p>
+      </div>
+
+    </form>
+  </main>
+
+  <script src="js/api.js"></script>
+  <script src="js/app.js"></script>
+  <script src="js/charts.js"></script>
+</body>
+</html>

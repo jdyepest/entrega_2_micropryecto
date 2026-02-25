@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SciText-ES — Segmentación retórica</title>
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+
+  <!-- Navbar -->
+  <nav class="navbar">
+    <div class="navbar-brand">
+      SciText-ES <span class="badge-es">ES</span>
+    </div>
+    <div class="navbar-steps">
+      <span class="step done">① Entrada</span>
+      <span class="step-sep">›</span>
+      <span class="step active">② Segmentación</span>
+      <span class="step-sep">›</span>
+      <span class="step">③ Contribuciones</span>
+      <span class="step-sep">›</span>
+      <span class="step">④ Comparación</span>
+    </div>
+  </nav>
+
+  <div class="page-container">
+
+    <div class="page-header">
+      <h1>Segmentación retórica</h1>
+      <p>Clasificación de párrafos en categorías retóricas del discurso científico</p>
+    </div>
+
+    <div class="layout-sidebar">
+
+      <!-- Sidebar izquierdo -->
+      <aside class="sidebar">
+        <h3>Categorías</h3>
+        <ul id="legend-list" class="legend-list">
+          <!-- Generado por app.js -->
+        </ul>
+
+        <div class="sidebar-stats">
+          <h3>Estadísticas</h3>
+          <div id="sidebar-stats">
+            <!-- Generado por app.js -->
+          </div>
+        </div>
+
+        <div class="model-badge-sidebar" id="model-badge">
+          <!-- Generado por app.js -->
+        </div>
+      </aside>
+
+      <!-- Contenido principal -->
+      <section>
+        <div id="error-container"></div>
+        <div id="segments-container" class="segments-list">
+          <!-- Generado por app.js -->
+          <div class="empty-state">
+            <div class="empty-state-icon">⏳</div>
+            <p>Cargando segmentos…</p>
+          </div>
+        </div>
+
+        <div class="view-nav">
+          <a href="index.html" class="btn btn-secondary">← Volver</a>
+          <div class="view-nav-right">
+            <button id="btn-contributions" class="btn btn-primary">
+              Ver contribuciones →
+            </button>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script src="js/app.js"></script>
+  <script src="js/charts.js"></script>
+</body>
+</html>

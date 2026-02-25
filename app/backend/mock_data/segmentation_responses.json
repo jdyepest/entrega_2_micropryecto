@@ -1,0 +1,19 @@
+{
+  "_comment": "Respuestas de ejemplo para referencia. El backend genera respuestas dinámicas basadas en el texto real del usuario.",
+  "example_segment": {
+    "paragraph_index": 0,
+    "text": "En este trabajo presentamos SciText-ES, un sistema de análisis automático de documentos científicos en español.",
+    "label": "INTRO",
+    "confidence": 0.91
+  },
+  "labels": {
+    "INTRO": {"color": "#1565C0", "description": "Introducción"},
+    "BACK":  {"color": "#6A1B9A", "description": "Antecedentes"},
+    "METH":  {"color": "#00838F", "description": "Metodología"},
+    "RES":   {"color": "#2E7D32", "description": "Resultados"},
+    "DISC":  {"color": "#E65100", "description": "Discusión"},
+    "CONTR": {"color": "#C62828", "description": "Contribución"},
+    "LIM":   {"color": "#4E342E", "description": "Limitaciones"},
+    "CONC":  {"color": "#283593", "description": "Conclusión"}
+  }
+}

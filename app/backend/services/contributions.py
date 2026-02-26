@@ -23,6 +23,7 @@ import logging
 from services.models import MODELS
 from services.local_llm import ollama_chat_json, parse_json_loose
 from services.errors import UpstreamServiceError
+from services.s3_hf import download_hf_model_from_s3
 
 logger = logging.getLogger(__name__)
 
@@ -515,6 +516,22 @@ def task2_encoder_is_configured(encoder_variant: str) -> bool:
 
 
 def _download_model_from_mlflow(model_uri: str, cache_prefix: str) -> Path:
+    if model_uri.strip().startswith("s3://"):
+        cache_root = (os.environ.get("MODEL_CACHE_DIR") or str(_repo_root() / "artifacts" / "model_cache")).strip()
+        cache_root_path = Path(cache_root)
+        cache_root_path.mkdir(parents=True, exist_ok=True)
+
+        key = hashlib.sha1(model_uri.encode("utf-8")).hexdigest()[:12]
+        dst = cache_root_path / f"{cache_prefix}_{key}"
+        dst.mkdir(parents=True, exist_ok=True)
+
+        existing_cfgs = list(dst.rglob("config.json"))
+        if existing_cfgs:
+            parent = existing_cfgs[0].parent
+            if (parent / "model.safetensors").exists() or (parent / "pytorch_model.bin").exists():
+                return parent
+        return download_hf_model_from_s3(model_uri, dst)
+
     try:
         import mlflow
         from mlflow.artifacts import download_artifacts
@@ -542,6 +559,7 @@ def _download_model_from_mlflow(model_uri: str, cache_prefix: str) -> Path:
         if (parent / "model.safetensors").exists() or (parent / "pytorch_model.bin").exists():
             return parent
 
+    logger.info("Task2 encoder: descargando artefacto MLflow (%s) a %s", model_uri, str(dst))
     downloaded_path = download_artifacts(artifact_uri=model_uri, dst_path=str(dst))
     downloaded = Path(downloaded_path)
     if downloaded.is_file():
@@ -604,6 +622,25 @@ def _load_task2_encoder(encoder_variant: str):
     model_path = _resolve_task2_encoder_model_path(encoder_variant=encoder_variant)
     if not model_path.exists():
         raise FileNotFoundError(f"No se encontró el modelo Task2 en {model_path}")
+
+    has_weights = any(
+        (model_path / name).exists()
+        for name in [
+            "model.safetensors",
+            "pytorch_model.bin",
+            "model.safetensors.index.json",
+            "pytorch_model.bin.index.json",
+        ]
+    )
+    if not has_weights:
+        files = sorted([p.name for p in model_path.iterdir() if p.is_file()])
+        raise FileNotFoundError(
+            "El artefacto descargado para Task2 no contiene pesos del modelo.\n"
+            f"Directorio: {model_path}\n"
+            f"Archivos encontrados: {files}\n"
+            "Se esperaba 'model.safetensors' (o 'pytorch_model.bin').\n"
+            "Solución: re-exporta/re-sube a S3 una carpeta HF que incluya los pesos."
+        )
     cache_key = str(model_path.resolve())
     if cache_key in _TASK2_ENCODER_CACHE:
         return _TASK2_ENCODER_CACHE[cache_key]

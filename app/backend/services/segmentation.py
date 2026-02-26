@@ -24,6 +24,7 @@ from services.models import MODELS
 from services.models import RHETORICAL_LABELS
 from services.local_llm import ollama_chat_json, parse_json_loose
 from services.errors import UpstreamServiceError
+from services.s3_hf import download_hf_model_from_s3
 
 logger = logging.getLogger(__name__)
 
@@ -545,6 +546,24 @@ def _load_encoder_model(encoder_variant: str):
             "Define TASK1_ENCODER_MODEL_PATH apuntando al directorio del modelo."
         )
 
+    has_weights = any(
+        (model_path / name).exists()
+        for name in [
+            "model.safetensors",
+            "pytorch_model.bin",
+            "model.safetensors.index.json",
+            "pytorch_model.bin.index.json",
+        ]
+    )
+    if not has_weights:
+        files = sorted([p.name for p in model_path.iterdir() if p.is_file()])
+        raise FileNotFoundError(
+            "El modelo encoder de Task1 no contiene pesos.\n"
+            f"Directorio: {model_path}\n"
+            f"Archivos encontrados: {files}\n"
+            "Se esperaba 'model.safetensors' (o 'pytorch_model.bin')."
+        )
+
     cache_key = str(model_path.resolve())
     if cache_key in _ENCODER_CACHE:
         return _ENCODER_CACHE[cache_key]
@@ -605,6 +624,22 @@ def _download_model_from_mlflow(model_uri: str) -> Path:
       - AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY / AWS_DEFAULT_REGION
       - MLFLOW_S3_ENDPOINT_URL (si usas MinIO)
     """
+    if model_uri.strip().startswith("s3://"):
+        cache_root = (os.environ.get("MODEL_CACHE_DIR") or str(_repo_root() / "artifacts" / "model_cache")).strip()
+        cache_root_path = Path(cache_root)
+        cache_root_path.mkdir(parents=True, exist_ok=True)
+        key = hashlib.sha1(model_uri.encode("utf-8")).hexdigest()[:12]
+        dst = cache_root_path / f"task1_encoder_{key}"
+        dst.mkdir(parents=True, exist_ok=True)
+        if (dst / "config.json").exists() and (
+            (dst / "model.safetensors").exists()
+            or (dst / "pytorch_model.bin").exists()
+            or (dst / "model.safetensors.index.json").exists()
+            or (dst / "pytorch_model.bin.index.json").exists()
+        ):
+            return dst
+        return download_hf_model_from_s3(model_uri, dst)
+
     try:
         import mlflow
         from mlflow.artifacts import download_artifacts
@@ -635,6 +670,7 @@ def _download_model_from_mlflow(model_uri: str) -> Path:
         if (parent / "model.safetensors").exists() or (parent / "pytorch_model.bin").exists():
             return parent
 
+    logger.info("Task1 encoder: descargando artefacto MLflow (%s) a %s", model_uri, str(dst))
     downloaded_path = download_artifacts(artifact_uri=model_uri, dst_path=str(dst))
     downloaded = Path(downloaded_path)
 
@@ -654,7 +690,7 @@ def _download_model_from_mlflow(model_uri: str) -> Path:
     return downloaded
 
 
-def _call_encoder_model(text: str, encoder_variant: str = "roberta") -> dict:
+def _call_encoder_model(text: str, encoder_variant: str = "scibert") -> dict:
     """
     Segmentación real con el encoder RoBERTa local.
     Devuelve {segments:[...], stats:{...}} como el mock.

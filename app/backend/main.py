@@ -10,6 +10,14 @@ from pathlib import Path
 from flask import Flask, send_from_directory
 from flask_cors import CORS
 
+try:
+    from dotenv import find_dotenv, load_dotenv
+
+    load_dotenv(find_dotenv(usecwd=True), override=False)
+except Exception:
+    # Optional dependency; backend still works if env vars are exported.
+    pass
+
 from routes.analysis import analysis_bp
 from routes.comparison import comparison_bp
 from flasgger import Swagger
@@ -106,7 +114,9 @@ def upstream_error(e: UpstreamServiceError):
 
 @app.errorhandler(500)
 def server_error(e):
-    return {"error": "Error interno del servidor.", "detail": str(e)}, 500
+    original = getattr(e, "original_exception", None)
+    detail = str(original) if original else str(e)
+    return {"error": "Error interno del servidor.", "detail": detail}, 500
 
 
 if __name__ == "__main__":

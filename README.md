@@ -104,7 +104,34 @@ Este repositorio cubre todo el flujo de solución:
 
 ## Cómo lanzar el proyecto
 
-### 1. Configurar AWS (credenciales)
+### 1. Configurar variables de entorno (recomendado: `.env`)
+
+El backend carga automáticamente un archivo `.env` (si existe) al arrancar.
+
+Variables típicas:
+
+```bash
+# Flask
+PORT=5000
+DEBUG=1
+LOG_LEVEL=INFO  # DEBUG para más detalle
+
+# Gemini (model="api")
+GEMINI_API_KEY="..."
+GEMINI_MODEL="gemini-2.5-flash"
+GEMINI_TIMEOUT_S=60
+GEMINI_STRUCTURED_OUTPUT=1
+
+# Ollama (model="llm")
+OLLAMA_BASE_URL="http://localhost:11434"
+LOCAL_LLM_VARIANT=small   # small (~3B) | large (8B)
+LOCAL_LLM_MODEL=""        # opcional: override del tag
+
+# Cache local (evita re-descargas de modelos)
+MODEL_CACHE_DIR=artifacts/model_cache
+```
+
+### 2. Configurar AWS (para descargar modelos desde S3)
 
 ```bash
 aws configure
@@ -116,7 +143,7 @@ Verificar que quedaron activas:
 aws sts get-caller-identity
 ```
 
-### 2. Descargar los datos con DVC
+### 3. Descargar los datos con DVC
 
 Desde la raíz del repositorio:
 
@@ -124,10 +151,9 @@ Desde la raíz del repositorio:
 dvc pull
 ```
 
-### 3. Ejecutar la aplicación web
+### 4. Ejecutar la aplicación web
 
 ```bash
-# Desde la raíz del repositorio
 cd app/backend
 
 # Crear entorno virtual (recomendado)
@@ -173,25 +199,17 @@ Devuelve segmentos etiquetados y fragmentos con contribuciones.
 
 Devuelve métricas comparativas de los 3 modelos para el texto analizado.
 
-### Cómo reemplazar los mocks por modelos reales
+### Swagger / OpenAPI
 
-Los servicios están diseñados para facilitar la transición:
+La app expone documentación interactiva:
 
-**Tarea 1 — `app/backend/services/segmentation.py`**
-```python
-def analyze_segments(text: str, model: str) -> dict:
-    # Reemplaza _mock_analyze() por _call_real_model()
-    return _call_real_model(text, model)  # ← descomentar cuando esté listo
+- UI: `http://localhost:5000/apidocs/`
+- Spec JSON: `http://localhost:5000/apispec_1.json`
+
+Para exportar el spec:
+```bash
+curl -s "http://localhost:5000/apispec_1.json" > apispec_1.json
 ```
-
-**Tarea 2 — `app/backend/services/contributions.py`**
-```python
-def analyze_contributions(segments: list[dict], model: str) -> dict:
-    # Mismo patrón
-    return _call_real_model(segments, model)
-```
-
-Los stubs tienen comentarios con ejemplos de integración para Hugging Face (encoder), Ollama (LLM open-weight) y OpenAI SDK (API comercial).
 
 ### Variables de entorno
 
@@ -222,20 +240,64 @@ TASK2_ENCODER_SCIBERT_MLFLOW_MODEL_URI="runs:/<run_id>/hf_model"
 TASK2_ENCODER_THRESHOLD=0.5
 ```
 
+**Nota (S3 directo, sin servidor MLflow):**
+
+También puedes apuntar directamente a un prefix en S3, por ejemplo:
+```bash
+TASK2_ENCODER_ROBERTA_MLFLOW_MODEL_URI="s3://<bucket>/<prefix>/hf_model"
+```
+El backend soporta descarga desde S3 sin listar el bucket (útil si tu IAM tiene `Deny` para `s3:ListBucket` pero permite `s3:GetObject`).
+
 **Scripts útiles:**
 - Subir una carpeta HF a MLflow: `app/backend/scripts/mlflow_log_hf_model.py`
-- Entrenar encoder Task2 (train=silver, eval=gold) y loguear a MLflow: `src/task2_contributions/train_task2_encoder.py`
 
 ### Dependencias de la app
 
 ```
 flask==3.0.3
 flask-cors==4.0.1
+flasgger==0.9.7.1
+python-dotenv==1.0.1
 ```
 
 Frontend: HTML + CSS + JavaScript vanilla (sin frameworks, sin build step).
 
 ---
+
+## Despliegue en EC2 (Ubuntu) — guía rápida
+
+1) Instalar dependencias del sistema:
+```bash
+sudo apt-get update
+sudo apt-get install -y python3 python3-venv python3-pip
+```
+
+2) Clonar repo y crear venv:
+```bash
+git clone <tu_repo>
+cd <tu_repo>/app/backend
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+3) Instalar dependencias de inferencia (si usas `model="encoder"`):
+```bash
+pip install torch transformers safetensors
+```
+
+4) Configurar `.env` en la raíz del repo (o exportar env vars). Para S3, idealmente usa un IAM Role en la instancia.
+
+5) Ejecutar (dev):
+```bash
+python main.py
+```
+
+Para producción, usa un WSGI server:
+```bash
+pip install gunicorn
+gunicorn -w 2 -b 0.0.0.0:5000 main:app
+```
 
 ## Integrantes
 

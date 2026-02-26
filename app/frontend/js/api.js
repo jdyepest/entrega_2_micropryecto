@@ -27,8 +27,8 @@ function _defaultApiBase() {
 }
 
 const API_BASE = _defaultApiBase();
-const ANALYZE_TIMEOUT_MS = 60000; // Gemini/LLM/descargas iniciales pueden tardar > 8s
-const COMPARE_TIMEOUT_MS = 8000;
+const ANALYZE_TIMEOUT_MS = 600000; // Gemini/LLM/descargas iniciales pueden tardar > 8s
+const COMPARE_TIMEOUT_MS = 80000;
 
 /* ================================================================
    Mock de navegador (replica la lógica del backend en Python)

@@ -2,14 +2,31 @@
  * api.js — Cliente HTTP para el backend SciText-ES
  *
  * Estrategia de fallback:
- *   1. Intenta llamar al backend real (http://localhost:5000).
+ *   1. Intenta llamar al backend real (misma origin por defecto).
  *   2. Si el servidor no está disponible (Failed to fetch, CORS, timeout),
  *      genera los datos localmente con el mock de navegador.
  *   3. El resto de la app (app.js) recibe exactamente el mismo formato
  *      sin importar si los datos vienen del servidor o del mock local.
  */
 
-const API_BASE = "http://localhost:5000";
+function _defaultApiBase() {
+  // In prod (EC2), the frontend is served by the backend on the same origin.
+  // Using window.location.origin prevents accidental calls to the user's localhost,
+  // which would trigger the browser mock fallback.
+  try {
+    const overridden = window?.SCITEXT_API_BASE;
+    if (typeof overridden === "string" && overridden.trim()) {
+      return overridden.trim().replace(/\/$/, "");
+    }
+    const origin = window?.location?.origin;
+    if (origin && origin !== "null") return origin;
+  } catch {
+    // Ignore.
+  }
+  return "http://localhost:5000";
+}
+
+const API_BASE = _defaultApiBase();
 const ANALYZE_TIMEOUT_MS = 60000; // Gemini/LLM/descargas iniciales pueden tardar > 8s
 const COMPARE_TIMEOUT_MS = 8000;
 

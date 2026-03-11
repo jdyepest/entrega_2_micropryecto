@@ -21,7 +21,7 @@ from typing import Any
 import logging
 
 from services.models import MODELS
-from services.local_llm import ollama_chat_json, parse_json_loose
+from services.local_llm import llm_chat_json, parse_json_loose
 from services.errors import UpstreamServiceError
 from services.s3_hf import download_hf_model_from_s3
 
@@ -251,7 +251,7 @@ def _call_local_llm(segments: list[dict]) -> dict:
     )
 
     started = time.perf_counter()
-    parsed = ollama_chat_json(prompt)
+    parsed = llm_chat_json(prompt)
     elapsed = round(time.perf_counter() - started, 2)
     parsed = parsed.get("result") if isinstance(parsed, dict) and "result" in parsed else parsed
 

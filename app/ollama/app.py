@@ -36,6 +36,7 @@ def _env(name: str, default: str = "") -> str:
 
 def _openrouter_headers() -> dict[str, str]:
     api_key = _env("OPENROUTER_API_KEY")
+    logger.info("OPENROUTER_API_KEY present=%s length=%s", bool(api_key), len(api_key) if api_key else 0)
     if not api_key:
         raise HTTPException(status_code=500, detail="OPENROUTER_API_KEY no está configurada")
 

@@ -47,6 +47,20 @@ Recomendación: usar **Chrome** o **Firefox** actualizados.
 2. Pega el texto en el campo principal.
 3. El sistema separa párrafos cuando hay líneas en blanco.
 
+**Ejemplo de texto para analizar**
+
+```text
+En este trabajo presentamos un sistema automático para segmentar secciones retóricas en artículos científicos en español. El objetivo principal es facilitar la recuperación de información y la comparación de métodos en el dominio académico. La motivación surge de la dificultad de analizar manualmente grandes volúmenes de literatura.
+
+En la literatura previa, diversos autores han propuesto técnicas basadas en reglas y modelos estadísticos para identificar introducción, metodología y resultados. Sin embargo, estos enfoques suelen degradarse cuando el estilo del artículo cambia o cuando el dominio es muy específico.
+
+Nuestra metodología combina un modelo encoder fine-tuned con un clasificador ligero para cada párrafo. Utilizamos un corpus de artículos científicos y aplicamos normalización, limpieza y segmentación. El entrenamiento se realizó con validación cruzada y ajuste de hiperparámetros.
+
+Los resultados obtenidos demuestran mejoras consistentes en F1 frente a un baseline. En la tabla 2 se observa que el modelo propuesto supera el rendimiento de métodos clásicos en las categorías METH y RES.
+
+En conclusión, el sistema propuesto mejora la identificación de secciones retóricas y permite detectar aportes científicos con mayor precisión. Como trabajo futuro, se evaluará la transferencia a otros dominios y la incorporación de modelos más grandes.
+```
+
 ### 3.2 Selección de modelo
 
 - **Encoder (BETO/RoBERTa)**
@@ -166,6 +180,7 @@ En la vista de comparación, puedes usar **Exportar reporte** para guardar un JS
 ### 8.3 “Rate limited” (OpenRouter)
 - El modelo gratuito está temporalmente limitado.
 - Espera y reintenta o cambia de modelo.
+- **Recomendación:** deja unos minutos entre ejecuciones cuando uses el modelo Llama 3.3 70B (OpenRouter free).
 
 ---
 

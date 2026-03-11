@@ -22,7 +22,7 @@ import logging
 
 from services.models import MODELS
 from services.models import RHETORICAL_LABELS
-from services.local_llm import ollama_chat_json, parse_json_loose
+from services.local_llm import llm_chat_json, parse_json_loose
 from services.errors import UpstreamServiceError
 from services.s3_hf import download_hf_model_from_s3
 
@@ -336,7 +336,7 @@ def _call_local_llm(text: str) -> dict:
     logger.info("Task1 local LLM request: paragraphs=%d", len(paragraphs))
 
     started = time.perf_counter()
-    parsed = ollama_chat_json(prompt)
+    parsed = llm_chat_json(prompt)
     elapsed = round(time.perf_counter() - started, 2)
     logger.debug("Task1 local LLM raw text (truncado): %s", str(parsed)[:800])
     parsed = parsed.get("result") if isinstance(parsed, dict) and "result" in parsed else parsed

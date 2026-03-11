@@ -210,7 +210,7 @@ const _MOCK = (() => {
     return {
       id,
       model,
-      model_name: { encoder:"Encoder (BETO/RoBERTa)", llm:"Llama 3.3 70B (OpenRouter)", api:"API Comercial" }[model],
+      model_name: { encoder:"Encoder (BETO/RoBERTa)", llm:"Llama 3.2 3B Instruct (OpenRouter)", api:"API Comercial" }[model],
       segmentation: tasks.includes("segmentation") ? segmentation : null,
       contributions: tasks.includes("contributions") ? contributions : null,
     };

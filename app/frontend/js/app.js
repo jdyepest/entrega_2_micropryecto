@@ -99,7 +99,7 @@ function labelBadge(label) {
 function modelName(model) {
   const names = {
     encoder: "Encoder (BETO/RoBERTa)",
-    llm: "Llama 3.3 70B (OpenRouter)",
+    llm: "Llama 3.2 3B Instruct (OpenRouter)",
     api: "API Comercial",
   };
   return names[model] || model;
@@ -438,7 +438,7 @@ function renderBarChart(containerId, values, models, colors, labelFn, unit) {
   if (!el) return;
 
   const max = Math.max(...models.map(m => values[m]));
-  const modelNames = { encoder: "Encoder", llm: "Llama 3.3", api: "API" };
+  const modelNames = { encoder: "Encoder", llm: "Llama 3.2 3B Instruct", api: "API" };
   const modelIcons = { encoder: "⚡", llm: "🧠", api: "☁️" };
 
   el.innerHTML = models.map(m => {
@@ -466,7 +466,7 @@ function renderTradeoffs(metrics) {
       cons: ["Menor F1 en Tarea 2 vs API", "Limitado a idiomas entrenados", "Requiere GPU para escala"],
     },
     {
-      model: "llm", icon: "🧠", name: "Llama 3.3 70B (OpenRouter)",
+      model: "llm", icon: "🧠", name: "Llama 3.2 3B Instruct (OpenRouter)",
       color: "#7B1FA2",
       pros: ["Calidad alta sin GPU local", "Integración rápida vía API", "Buen recall en Tarea 2", "Escala sin infraestructura propia"],
       cons: ["Rate limits en modelo free", "Dependencia de proveedor externo", "Latencia variable (" + metrics.total_time.llm.toFixed(1) + "s)"],

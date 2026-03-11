@@ -122,10 +122,17 @@ GEMINI_MODEL="gemini-2.5-flash"
 GEMINI_TIMEOUT_S=60
 GEMINI_STRUCTURED_OUTPUT=1
 
-# Ollama (model="llm")
+# LLM vía OpenRouter (model="llm")
+# El backend llama a un proxy compatible con Ollama en OLLAMA_BASE_URL.
+# Local: http://localhost:11434 | Docker Compose: http://ollama:11434
 OLLAMA_BASE_URL="http://localhost:11434"
-LOCAL_LLM_VARIANT=small   # small (~3B) | large (8B)
-LOCAL_LLM_MODEL=""        # opcional: override del tag
+OPENROUTER_API_KEY="..."   # requerido
+OPENROUTER_MODEL="meta-llama/llama-3.3-70b-instruct:free"
+OPENROUTER_BASE_URL="https://openrouter.ai/api/v1"
+OPENROUTER_TIMEOUT_S=120
+OPENROUTER_PROVIDER_ONLY="open-inference"   # opcional
+OPENROUTER_QUANTIZATIONS="int8"             # opcional
+OPENROUTER_ALLOW_FALLBACKS=0                # opcional
 
 # Cache local (evita re-descargas de modelos)
 MODEL_CACHE_DIR=artifacts/model_cache
@@ -151,7 +158,7 @@ Desde la raíz del repositorio:
 dvc pull
 ```
 
-### 4. Ejecutar la aplicación web
+### 4. Ejecutar la aplicación web (sin Docker)
 
 ```bash
 cd app/backend
@@ -170,6 +177,80 @@ python main.py
 ```
 
 Abre http://localhost:5000 en tu navegador.
+
+**Nota (sin Docker):**
+- Ajusta `OLLAMA_BASE_URL=http://127.0.0.1:11434`
+- Ajusta `MLFLOW_TRACKING_URI=http://127.0.0.1:5006` si vas a levantar MLflow local
+
+#### Proxy LLM (OpenRouter) — sin Docker
+
+En otra terminal (para habilitar el modelo LLM):
+
+```bash
+cd app/ollama
+python -m venv venv
+source venv/bin/activate
+pip install fastapi uvicorn httpx
+uvicorn app:app --host 0.0.0.0 --port 11434
+```
+
+#### MLflow (opcional) — sin Docker
+
+Si usas `TASK1/TASK2_ENCODER_*_MLFLOW_MODEL_URI`, levanta el servidor MLflow:
+
+```bash
+# desde la raíz del repo
+pip install mlflow boto3
+mlflow server \
+  --backend-store-uri sqlite:///./mlflow.db \
+  --default-artifact-root s3://bucket-artifacts-models-2026-03/mlflow \
+  --host 0.0.0.0 --port 5006
+```
+
+---
+
+## Docker (backend + OpenRouter proxy + MLflow)
+
+Para tener el backend listo como imagen Docker (ideal para ECS/Fargate o local) con
+datos descargados por DVC **durante el build**:
+
+```bash
+# Construir imagen
+docker build -f app/backend/Dockerfile -t scitext-backend . \
+  --build-arg AWS_ACCESS_KEY_ID=... \
+  --build-arg AWS_SECRET_ACCESS_KEY=... \
+  --build-arg AWS_SESSION_TOKEN=... \
+  --build-arg AWS_DEFAULT_REGION=us-east-1
+
+# Ejecutar (el proxy OpenRouter corre aparte en :11434)
+docker run --rm -p 5000:5000 \
+  -e PORT=5000 \
+  -e OLLAMA_BASE_URL="http://host.docker.internal:11434" \
+  scitext-backend
+```
+
+También puedes usar `docker compose` para levantar backend + proxy OpenRouter + MLflow:
+
+```bash
+docker compose up --build
+```
+
+Antes de levantar con Docker, asegúrate de definir `OPENROUTER_API_KEY` en `.env`.
+
+> Nota: La imagen del backend copia `.env` dentro del contenedor (por simplicidad).
+> En ECS lo ideal es mover esas variables a la Task Definition.
+
+### Frontend local apuntando a backend remoto
+
+Si quieres abrir el frontend localmente y apuntar a un backend en ECS (u otra máquina),
+edita `app/frontend/config.js` y define:
+
+```js
+window.SCITEXT_API_BASE = "https://TU_BACKEND";
+```
+
+Luego abre `app/frontend/index.html` en el navegador o levanta un servidor estático
+local. El backend ya permite CORS en `/api/*`.
 
 ---
 

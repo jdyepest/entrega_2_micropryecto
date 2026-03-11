@@ -1,0 +1,23 @@
+.git
+.dvc/cache
+.venv
+__pycache__/
+*.pyc
+*.pyo
+*.log
+.DS_Store
+
+# Data & large artifacts
+artifacts/
+app/backend/artifacts/
+datos/
+data_lake/*
+!data_lake/*.dvc
+notebooks/
+experiments/
+evaluation/
+mlflow.db
+
+# Misc
+~
+Propuesta_Proyecto_PLN_FLAG.pdf

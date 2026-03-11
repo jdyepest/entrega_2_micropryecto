@@ -5,6 +5,14 @@ import urllib.error
 import urllib.request
 from typing import Any
 
+try:
+    from dotenv import find_dotenv, load_dotenv
+
+    load_dotenv(find_dotenv(usecwd=True), override=False)
+except Exception:
+    # Optional dependency; continue if dotenv is not available.
+    pass
+
 from services.errors import UpstreamServiceError
 
 
@@ -84,6 +92,7 @@ def ollama_chat_json(
     base_url = get_ollama_base_url()
     temp = float(os.environ.get("LOCAL_LLM_TEMPERATURE") or "0.2") if temperature is None else float(temperature)
     tout = float(os.environ.get("LOCAL_LLM_TIMEOUT_S") or "60") if timeout_s is None else float(timeout_s)
+    print(tout)
 
     url = f"{base_url}/api/chat"
     payload = {

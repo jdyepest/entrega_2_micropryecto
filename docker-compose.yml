@@ -1,0 +1,63 @@
+services:
+  mlflow:
+    build:
+      context: .
+      dockerfile: app/mlflow/Dockerfile
+    ports:
+      - "5006:5006"
+    environment:
+      MLFLOW_SERVER_ALLOWED_HOSTS: "*"
+      MLFLOW_SERVER_CORS_ALLOWED_ORIGINS: "*"
+      MLFLOW_SERVER_DISABLE_SECURITY_MIDDLEWARE: "true"
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_SESSION_TOKEN: ${AWS_SESSION_TOKEN}
+      AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-us-east-1}
+    volumes:
+      - ./mlflow.db:/app/mlflow.db
+
+  ollama:
+    build:
+      context: .
+      dockerfile: app/ollama/Dockerfile
+    ports:
+      - "11434:11434"
+    environment:
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
+      OPENROUTER_MODEL: ${OPENROUTER_MODEL:-meta-llama/llama-3.3-70b-instruct:free}
+      OPENROUTER_BASE_URL: ${OPENROUTER_BASE_URL:-https://openrouter.ai/api/v1}
+      OPENROUTER_TIMEOUT_S: ${OPENROUTER_TIMEOUT_S:-120}
+      # Optional headers recommended by OpenRouter
+      OPENROUTER_HTTP_REFERER: ${OPENROUTER_HTTP_REFERER:-}
+      OPENROUTER_X_TITLE: ${OPENROUTER_X_TITLE:-}
+      # Set to 1 if you want response_format json_object
+      OPENROUTER_FORCE_JSON: ${OPENROUTER_FORCE_JSON:-0}
+      # Optional provider routing
+      OPENROUTER_PROVIDER_ONLY: ${OPENROUTER_PROVIDER_ONLY:-}
+      OPENROUTER_PROVIDER_ORDER: ${OPENROUTER_PROVIDER_ORDER:-}
+      OPENROUTER_PROVIDER_IGNORE: ${OPENROUTER_PROVIDER_IGNORE:-}
+      OPENROUTER_QUANTIZATIONS: ${OPENROUTER_QUANTIZATIONS:-}
+      OPENROUTER_ALLOW_FALLBACKS: ${OPENROUTER_ALLOW_FALLBACKS:-}
+
+  backend:
+    build:
+      context: .
+      dockerfile: app/backend/Dockerfile
+      args:
+        AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+        AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+        AWS_SESSION_TOKEN: ${AWS_SESSION_TOKEN}
+        AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-us-east-1}
+    depends_on:
+      - mlflow
+      - ollama
+    ports:
+      - "5000:5000"
+    environment:
+      PORT: 5000
+      MLFLOW_TRACKING_URI: ${MLFLOW_TRACKING_URI:-http://mlflow:5006}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://ollama:11434}
+      LOCAL_LLM_VARIANT: ${LOCAL_LLM_VARIANT:-small}
+      # LOCAL_LLM_MODEL: ""
+
+volumes: {}

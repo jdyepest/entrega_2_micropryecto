@@ -3,7 +3,6 @@ Rutas de comparación: GET /api/compare/<analysis_id>
 """
 
 import json
-import random
 from datetime import datetime
 from pathlib import Path
 from flask import Blueprint, jsonify
@@ -102,24 +101,15 @@ def _apply_eval_overrides(metrics: dict) -> dict:
 def _generate_comparison_metrics(text: str, seed_model: str) -> dict:
     """
     Genera métricas comparativas simuladas para los 3 modelos.
-    Las métricas del modelo usado en el análisis original son las más fieles;
-    las demás se simulan con variación realista.
+    Si no hay resultados reales en artifacts/eval_results, usa valores fijos.
     """
-    rng = random.Random(hash(text[:120]))
-
-    def _jitter(base: float, spread: float = 0.04) -> float:
-        return round(min(max(base + rng.uniform(-spread, spread), 0.50), 0.99), 2)
-
-    def _lat_jitter(base: float) -> float:
-        return round(base + rng.uniform(-0.2, 0.4), 2)
-
     task1 = {}
     task2 = {}
     for m, cfg in MODELS.items():
-        f1_1 = _jitter(cfg["task1_f1_base"])
-        prec_1 = _jitter(f1_1, 0.03)
-        rec_1 = _jitter(f1_1, 0.03)
-        lat_1 = _lat_jitter(cfg["simulated_delay_s"])
+        f1_1 = round(cfg["task1_f1_base"], 2)
+        prec_1 = round(min(f1_1 + 0.02, 0.99), 2)
+        rec_1 = round(min(f1_1 + 0.01, 0.99), 2)
+        lat_1 = round(cfg["simulated_delay_s"], 2)
         task1[m] = {
             "f1": f1_1,
             "precision": prec_1,
@@ -127,10 +117,10 @@ def _generate_comparison_metrics(text: str, seed_model: str) -> dict:
             "latency": lat_1,
         }
 
-        f1_2 = _jitter(cfg["task2_f1_base"])
-        prec_2 = _jitter(f1_2, 0.03)
-        rec_2 = _jitter(f1_2, 0.03)
-        lat_2 = _lat_jitter(cfg["simulated_delay_s"] * 0.6)
+        f1_2 = round(cfg["task2_f1_base"], 2)
+        prec_2 = round(min(f1_2 + 0.02, 0.99), 2)
+        rec_2 = round(min(f1_2 + 0.01, 0.99), 2)
+        lat_2 = round(cfg["simulated_delay_s"] * 0.6, 2)
         task2[m] = {
             "f1": f1_2,
             "precision": prec_2,
@@ -138,7 +128,7 @@ def _generate_comparison_metrics(text: str, seed_model: str) -> dict:
             "latency": lat_2,
         }
 
-    cost = {m: round(cfg["cost_per_doc"] * rng.uniform(0.9, 1.1), 4) for m, cfg in MODELS.items()}
+    cost = {m: round(cfg["cost_per_doc"], 4) for m, cfg in MODELS.items()}
     total_time = {
         "encoder": round(task1["encoder"]["latency"] + task2["encoder"]["latency"], 2),
         "llm": round(task1["llm"]["latency"] + task2["llm"]["latency"], 2),

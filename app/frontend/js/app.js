@@ -337,15 +337,12 @@ function initContributionsView() {
 
 async function initComparisonView() {
   const analysis = loadAnalysis();
-
-  if (!analysis) {
-    showError("Sin análisis cargado. Realiza primero un análisis.", "comparison-error");
-    return;
-  }
+  const analysisId = analysis?.id || "static";
+  const analysisModel = analysis?.model || "static";
 
   showLoading("Cargando métricas comparativas…");
   try {
-    const metrics = await apiCompare(analysis.id);
+    const metrics = await apiCompare(analysisId);
     hideLoading();
     renderComparison(metrics);
   } catch (err) {
@@ -358,8 +355,8 @@ async function initComparisonView() {
   if (btnExport) {
     btnExport.addEventListener("click", async () => {
       try {
-        const m = await apiCompare(analysis.id);
-        exportJson({ analysis_id: analysis.id, model: analysis.model, ...m }, "scitext_report.json");
+        const m = await apiCompare(analysisId);
+        exportJson({ analysis_id: analysisId, model: analysisModel, ...m }, "scitext_report.json");
       } catch (e) {
         showError(e.message, "comparison-error");
       }

@@ -28,7 +28,7 @@ function _defaultApiBase() {
 
 const API_BASE = _defaultApiBase();
 const ANALYZE_TIMEOUT_MS = 600000; // Gemini/LLM/descargas iniciales pueden tardar > 8s
-const COMPARE_TIMEOUT_MS = 80000;
+// Comparación ahora es totalmente estática (sin endpoint).
 
 /* ================================================================
    Mock de navegador (replica la lógica del backend en Python)
@@ -41,6 +41,31 @@ const _MOCK = (() => {
     encoder: { delay: 500,  task1F1: 0.83, task2F1: 0.78, cost: 0.001 },
     llm:     { delay: 2000, task1F1: 0.79, task2F1: 0.82, cost: 0.008 },
     api:     { delay: 1500, task1F1: 0.87, task2F1: 0.91, cost: 0.035 },
+  };
+
+  // ── Resultados fijos para comparación (fuente: artifacts/eval_results/*.json) ──
+  // encoder_roberta.json, openrouter_meta-llama_llama-3.2-3b-instruct.json, gemini_gemini-2.5-flash-lite.json
+  const FIXED_COMPARE_METRICS = {
+    task1_metrics: {
+      encoder: { f1: 0.3959, precision: 0.389,  recall: 0.3367, latency: 20.4958 },
+      llm:     { f1: 0.6168, precision: 0.6689, recall: 0.699,  latency: 12.632  },
+      api:     { f1: 0.9195, precision: 0.9466, recall: 0.975,  latency: 5.0452  },
+    },
+    task2_metrics: {
+      encoder: { f1: 0.3769, precision: 0.4021, recall: 0.3825, latency: 25.5897 },
+      llm:     { f1: 0.6371, precision: 0.5696, recall: 0.6316, latency: 8.2272  },
+      api:     { f1: 0.9366, precision: 0.9711, recall: 0.9517, latency: 6.3713  },
+    },
+    cost_per_doc: {
+      encoder: 0.001,
+      llm: 0.008,
+      api: 0.035,
+    },
+    total_time: {
+      encoder: 21514.57,
+      llm: 11751.07,
+      api: 5310.46,
+    },
   };
 
   // ── Keywords por categoría retórica ──────────────────────────
@@ -217,34 +242,11 @@ const _MOCK = (() => {
   }
 
   // ── Mock /api/compare ─────────────────────────────────────────
+  // Usa valores fijos de artifacts/eval_results para evitar variación en cada carga.
   async function mockCompare(analysisId) {
-    const rng = seededRng(strHash(analysisId));
-
-    function jit(base, spread = 0.04) {
-      return Math.round(Math.min(0.99, Math.max(0.50, base + (rng()*2-1)*spread)) * 100) / 100;
-    }
-    function latJit(base) {
-      return Math.round((base + (rng()*2-1)*0.2) * 100) / 100;
-    }
-
-    const cfgs = {
-      encoder: { t1f1: 0.83, t2f1: 0.78, delay: 0.5,  cost: 0.001 },
-      llm:     { t1f1: 0.79, t2f1: 0.82, delay: 2.0,  cost: 0.008 },
-      api:     { t1f1: 0.87, t2f1: 0.91, delay: 1.5,  cost: 0.035 },
-    };
-
-    const t1 = {}, t2 = {};
-    for (const [m, c] of Object.entries(cfgs)) {
-      const f1a = jit(c.t1f1); t1[m] = { f1: f1a, precision: jit(f1a, 0.03), recall: jit(f1a, 0.03), latency: latJit(c.delay) };
-      const f1b = jit(c.t2f1); t2[m] = { f1: f1b, precision: jit(f1b, 0.03), recall: jit(f1b, 0.03), latency: latJit(c.delay * 0.6) };
-    }
-
     return {
       analysis_id: analysisId,
-      task1_metrics: t1,
-      task2_metrics: t2,
-      cost_per_doc: { encoder: Math.round(cfgs.encoder.cost*(0.9+rng()*0.2)*10000)/10000, llm: Math.round(cfgs.llm.cost*(0.9+rng()*0.2)*10000)/10000, api: Math.round(cfgs.api.cost*(0.9+rng()*0.2)*10000)/10000 },
-      total_time:   { encoder: Math.round((t1.encoder.latency+t2.encoder.latency)*100)/100, llm: Math.round((t1.llm.latency+t2.llm.latency)*100)/100, api: Math.round((t1.api.latency+t2.api.latency)*100)/100 },
+      ...FIXED_COMPARE_METRICS,
     };
   }
 
@@ -298,32 +300,8 @@ async function apiAnalyze(text, model, tasks) {
 }
 
 /**
- * GET /api/compare/:id — con fallback a mock de navegador.
+ * Comparación totalmente estática (sin endpoint).
  */
 async function apiCompare(analysisId) {
-  try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), COMPARE_TIMEOUT_MS);
-
-    const resp = await fetch(`${API_BASE}/api/compare/${analysisId}`, {
-      signal: controller.signal,
-    });
-    clearTimeout(timer);
-
-    if (!resp.ok) {
-      const err = await resp.json().catch(() => ({}));
-      throw new Error(err.detail || err.error || `Error del servidor (${resp.status})`);
-    }
-    return resp.json();
-
-  } catch (fetchErr) {
-    if (fetchErr?.name === "AbortError") {
-      throw new Error(`Timeout llamando al backend (${Math.round(COMPARE_TIMEOUT_MS/1000)}s). Reintenta.`);
-    }
-    if (_isNetworkLikeError(fetchErr)) {
-      console.warn("[SciText-ES] Backend no disponible, usando mock local:", fetchErr.message);
-      return _MOCK.mockCompare(analysisId);
-    }
-    throw fetchErr;
-  }
+  return _MOCK.mockCompare(analysisId);
 }

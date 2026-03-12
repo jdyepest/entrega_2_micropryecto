@@ -34,6 +34,12 @@ app = Flask(
 CORS(app, resources={r"/api/*": {"origins": "*"}})
 
 # ---------------------------------------------------------------------------
+# Paths
+# ---------------------------------------------------------------------------
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+_EVAL_RESULTS_DIR = _REPO_ROOT / "artifacts" / "eval_results"
+
+# ---------------------------------------------------------------------------
 # Logging
 # ---------------------------------------------------------------------------
 _log_level = (os.environ.get("LOG_LEVEL") or "INFO").upper()
@@ -99,6 +105,15 @@ def static_files(path):
         return send_from_directory(app.static_folder, path)
     # Fallback a index.html para rutas desconocidas
     return send_from_directory(app.static_folder, "index.html")
+
+# ---------------------------------------------------------------------------
+# Servir resultados estáticos de evaluación
+# ---------------------------------------------------------------------------
+@app.route("/artifacts/eval_results/<path:filename>")
+def eval_results_files(filename):
+    if not _EVAL_RESULTS_DIR.exists():
+        return {"error": "Resultados de evaluación no encontrados."}, 404
+    return send_from_directory(_EVAL_RESULTS_DIR, filename)
 
 
 # ---------------------------------------------------------------------------

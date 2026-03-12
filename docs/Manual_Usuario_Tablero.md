@@ -28,7 +28,7 @@ El tablero está organizado en 4 vistas principales:
 Abre en tu navegador la URL suministrada por el equipo. Ejemplo:
 
 ```
-http://<IP_PUBLICA>:5000
+http://52.91.169.210:5000/
 ```
 
 Recomendación: usar **Chrome** o **Firefox** actualizados.
@@ -36,6 +36,124 @@ Recomendación: usar **Chrome** o **Firefox** actualizados.
 **Imagen 1 — Pantalla de acceso**
 
 ![Pantalla de acceso](../docs/images/01_acceso.png)
+
+---
+
+## 2.1 Acceso vía API (opcional)
+
+Además del tablero, la API se puede consumir directamente (por ejemplo desde **Postman**), ya sea contra un backend local o una **IP pública**.
+
+**Base URL**
+- Local: `http://localhost:5000`
+- IP pública: `http://<IP_PUBLICA>:5000` (ejemplo: `http://52.91.169.210:5000`)
+
+### 2.1.1 Endpoint principal — Análisis
+
+- **Método:** `POST`
+- **Ruta:** `/api/analyze`
+- **Headers:** `Content-Type: application/json`
+
+**Mock de request (Postman)**
+
+```json
+{
+  "text": "En este trabajo presentamos un sistema automático para segmentar secciones retóricas en artículos científicos en español. El objetivo es facilitar la recuperación de información y la comparación de métodos.\n\nNuestra metodología combina un modelo encoder con un clasificador ligero. Evaluamos en un corpus de artículos y reportamos mejoras en F1.",
+  "model": "encoder",
+  "tasks": ["segmentation", "contributions"],
+  "encoder_variant": "roberta"
+}
+```
+
+**Imagen 1.1 — Ejemplo en Postman**
+
+![Postman](../docs/images/postman.png)
+
+**Mock de response (200)**
+
+```json
+{
+  "id": "b8b2e9b1-3d3e-4d2d-9c85-1c2f4b7b3a21",
+  "model": "encoder",
+  "model_name": "Encoder (BETO/RoBERTa)",
+  "segmentation": {
+    "segments": [
+      {
+        "paragraph_index": 0,
+        "text": "En este trabajo presentamos un sistema automático para segmentar secciones retóricas en artículos científicos en español. El objetivo es facilitar la recuperación de información y la comparación de métodos.",
+        "label": "INTRO",
+        "confidence": 0.86
+      },
+      {
+        "paragraph_index": 1,
+        "text": "Nuestra metodología combina un modelo encoder con un clasificador ligero. Evaluamos en un corpus de artículos y reportamos mejoras en F1.",
+        "label": "METH",
+        "confidence": 0.83
+      }
+    ],
+    "stats": {
+      "total_paragraphs": 2,
+      "total_words": 58,
+      "avg_confidence": 0.845,
+      "time_seconds": 0.62
+    }
+  },
+  "contributions": {
+    "fragments": [
+      {
+        "paragraph_index": 0,
+        "text": "En este trabajo presentamos un sistema automático para segmentar secciones retóricas en artículos científicos en español. El objetivo es facilitar la recuperación de información y la comparación de métodos.",
+        "is_contribution": false,
+        "contribution_type": null,
+        "confidence": 0.31,
+        "highlight": "",
+        "source_label": "INTRO"
+      },
+      {
+        "paragraph_index": 1,
+        "text": "Nuestra metodología combina un modelo encoder con un clasificador ligero. Evaluamos en un corpus de artículos y reportamos mejoras en F1.",
+        "is_contribution": true,
+        "contribution_type": null,
+        "confidence": 0.82,
+        "highlight": "Nuestra metodología combina un modelo encoder",
+        "source_label": "METH"
+      }
+    ],
+    "stats": {
+      "total_fragments": 2,
+      "positive": 1,
+      "negative": 1,
+      "avg_confidence_positive": 0.82
+    }
+  }
+}
+```
+
+### 2.1.2 Endpoint de comparación
+
+- **Método:** `GET`
+- **Ruta:** `/api/compare/{analysis_id}`
+- **Nota:** Usa el `analysis_id` devuelto por `/api/analyze`.
+
+**Mock de response (200)**
+
+```json
+{
+  "analysis_id": "b8b2e9b1-3d3e-4d2d-9c85-1c2f4b7b3a21",
+  "original_model": "encoder",
+  "task1_metrics": {
+    "encoder": { "f1": 0.84, "precision": 0.85, "recall": 0.83, "latency": 0.55 },
+    "llm": { "f1": 0.80, "precision": 0.79, "recall": 0.81, "latency": 2.05 },
+    "api": { "f1": 0.88, "precision": 0.89, "recall": 0.87, "latency": 1.45 }
+  },
+  "task2_metrics": {
+    "encoder": { "f1": 0.78, "precision": 0.77, "recall": 0.79, "latency": 0.32 },
+    "llm": { "f1": 0.83, "precision": 0.82, "recall": 0.84, "latency": 1.18 },
+    "api": { "f1": 0.91, "precision": 0.92, "recall": 0.90, "latency": 0.86 }
+  },
+  "cost_per_doc": { "encoder": 0.0011, "llm": 0.0083, "api": 0.0345 },
+  "total_time": { "encoder": 0.87, "llm": 3.23, "api": 2.31 }
+}
+```
 
 ---
 

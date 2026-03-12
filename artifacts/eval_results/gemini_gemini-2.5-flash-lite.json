@@ -1,0 +1,36 @@
+{
+  "meta": {
+    "model_label": "gemini-gemini-2.5-flash-lite",
+    "run_at": "2026-03-11T04:13:59.883971+00:00",
+    "params": {
+      "model": "gemini-2.5-flash-lite",
+      "batch_task1": 150,
+      "batch_task2": 150,
+      "limit": null
+    }
+  },
+  "results": [
+    {
+      "task": "task1",
+      "model": "api",
+      "n": 800,
+      "accuracy": 0.9365,
+      "precision": 0.9466,
+      "recall": 0.975,
+      "f1": 0.9195,
+      "total_time_s": 4036.1924,
+      "time_per_doc_s": 5.0452
+    },
+    {
+      "task": "task2",
+      "model": "api",
+      "n": 200,
+      "accuracy": 0.9795,
+      "precision": 0.9711,
+      "recall": 0.9517,
+      "f1": 0.9366,
+      "total_time_s": 1274.2643,
+      "time_per_doc_s": 6.3713
+    }
+  ]
+}

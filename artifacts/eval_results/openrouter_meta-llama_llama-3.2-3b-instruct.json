@@ -1,0 +1,37 @@
+{
+  "meta": {
+    "model_label": "openrouter-meta-llama/llama-3.2-3b-instruct",
+    "run_at": "2026-03-11T04:38:07.327812+00:00",
+    "params": {
+      "model": "meta-llama/llama-3.2-3b-instruct",
+      "batch_task1": 1,
+      "batch_task2": 1,
+      "limit": null,
+      "provider": "openrouter"
+    }
+  },
+  "results": [
+    {
+      "task": "task1",
+      "model": "llm",
+      "n": 800,
+      "accuracy": 0.6208,
+      "precision": 0.6689,
+      "recall": 0.699,
+      "f1": 0.6168,
+      "total_time_s": 10105.6247,
+      "time_per_doc_s": 12.632
+    },
+    {
+      "task": "task2",
+      "model": "llm",
+      "n": 200,
+      "accuracy": 0.699,
+      "precision": 0.5696,
+      "recall": 0.6316,
+      "f1": 0.6371,
+      "total_time_s": 1645.4476,
+      "time_per_doc_s": 8.2272
+    }
+  ]
+}
